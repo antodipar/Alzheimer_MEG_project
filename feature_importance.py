@@ -22,3 +22,17 @@ def ttest(X, Y):
         importance[i] = abs(t)
 
     return importance
+
+
+
+def acc(X, Y, clf):
+    # X: features, Y: labels
+
+    nfeats = X.shape[1]
+    importance = np.zeros((nfeats))
+
+    for i in np.arange(nfeats):
+        clf.fit(X[:,i][:,np.newaxis], Y)
+        importance[i] = clf.score(X[:,i][:,np.newaxis], Y)
+
+    return importance
