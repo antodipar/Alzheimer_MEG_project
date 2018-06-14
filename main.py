@@ -3,7 +3,6 @@
 
 # import basic modules
 import matplotlib.pyplot as plt
-plt.ioff() # turn the interactive mode off
 import numpy as np
 import pandas as pd
 
@@ -25,175 +24,14 @@ Y = data[:,1] > 1
 # *******************************************
 # *******************************************
 
-flag = False
+doEda = True
 n = 5151  # total number of features: 5151 x 5 = 25.755
-feat_mean = X[:, 0:n]
-feat_std = X[:, n:2*n]
-feat_median = X[:, 2*n:3*n]
-feat_mad = X[:, 3*n:4*n]
-feat_cov = X[:, 4*n:5*n]
 
-if flag:
+if doEda:
 
-
-    # compute pair-wise correlation to uncover linear dependencies
-
-    # Mean & std
-    corr_mean_std = np.zeros((n))
-    for i in np.arange(n):
-        corr_mean_std[i] = np.corrcoef(feat_mean[:,i], feat_std[:,i], rowvar = False)[0,1]
-
-    # Mean & median
-    corr_mean_median = np.zeros((n))
-    for i in np.arange(n):
-        corr_mean_median[i] = np.corrcoef(feat_mean[:,i], feat_median[:,i], rowvar = False)[0,1]
-
-    # Mean & mad
-    corr_mean_mad = np.zeros((n))
-    for i in np.arange(n):
-        corr_mean_mad[i] = np.corrcoef(feat_mean[:,i], feat_mad[:,i], rowvar = False)[0,1]
-
-    # Mean & cov
-    corr_mean_cov = np.zeros((n))
-    for i in np.arange(n):
-        corr_mean_cov[i] = np.corrcoef(feat_mean[:,i], feat_cov[:,i], rowvar = False)[0,1]
-
-    # Std & median
-    corr_std_median = np.zeros((n))
-    for i in np.arange(n):
-        corr_std_median[i] = np.corrcoef(feat_std[:,i], feat_median[:,i], rowvar = False)[0,1]
-
-    # Std & mad
-    corr_std_mad = np.zeros((n))
-    for i in np.arange(n):
-        corr_std_mad[i] = np.corrcoef(feat_std[:,i], feat_mad[:,i], rowvar = False)[0,1]
-
-    # Std & cov
-    corr_std_cov = np.zeros((n))
-    for i in np.arange(n):
-        corr_std_cov[i] = np.corrcoef(feat_std[:,i], feat_cov[:,i], rowvar = False)[0,1]
-
-    # Median & mad
-    corr_median_mad = np.zeros((n))
-    for i in np.arange(n):
-        corr_median_mad[i] = np.corrcoef(feat_median[:,i], feat_mad[:,i], rowvar = False)[0,1]
-
-    # Median & cov
-    corr_median_cov = np.zeros((n))
-    for i in np.arange(n):
-        corr_median_cov[i] = np.corrcoef(feat_median[:,i], feat_cov[:,i], rowvar = False)[0,1]
-
-    # Mad & cov
-    corr_mad_cov = np.zeros((n))
-    for i in np.arange(n):
-        corr_mad_cov[i] = np.corrcoef(feat_mad[:,i], feat_cov[:,i], rowvar = False)[0,1]
-
-    # Visualize data
-
-    # Mean & std
-    nbins = 20
-
-    plt.figure()
-    plt.subplot(4,4,1)
-    plt.hist(corr_mean_std, bins = nbins)
-    plt.xlabel('Corr mean-std')
-    plt.ylabel('Counts')
-    plt.show()
-
-    # Mean & median
-    plt.subplot(4,4,2)
-    plt.hist(corr_mean_median, bins = nbins)
-    # plt.xlabel('Corr mean-median')
-    # plt.ylabel('Counts')
-    plt.show()
-
-    # Mean & mad
-    plt.subplot(4,4,3)
-    plt.hist(corr_mean_mad, bins = nbins)
-    # plt.xlabel('Corr mean-mad')
-    # plt.ylabel('Counts')
-    plt.show()
-
-    # Mean & cov
-    plt.subplot(4,4,4)
-    plt.hist(corr_mean_cov, bins = nbins)
-    # plt.xlabel('Corr mean-cov')
-    # plt.ylabel('Counts')
-    plt.show()
-
-    # Std & median
-    plt.subplot(4,4,4+2)
-    plt.hist(corr_std_median, bins = nbins)
-    plt.xlabel('Corr std-median')
-    plt.ylabel('Counts')
-    plt.show()
-
-    # Std & mad
-    plt.subplot(4,4,4+3)
-    plt.hist(corr_std_mad, bins = nbins)
-    # plt.xlabel('Corr std-mad')
-    # plt.ylabel('Counts')
-    plt.show()
-
-    # Std & cov
-    plt.subplot(4,4,4+4)
-    plt.hist(corr_std_cov, bins = nbins)
-    # plt.xlabel('Corr std-cov')
-    # plt.ylabel('Counts')
-    plt.show()
-
-    # Median & mad
-    plt.subplot(4,4,8+3)
-    plt.hist(corr_median_mad, bins = nbins)
-    plt.xlabel('Corr median-mad')
-    plt.ylabel('Counts')
-    plt.show()
-
-    # Median & cov
-    plt.subplot(4,4,8+4)
-    plt.hist(corr_median_cov, bins = nbins)
-    # plt.xlabel('Corr median-cov')
-    # plt.ylabel('Counts')
-    plt.show()
-
-    # Mad & cov
-    plt.subplot(4,4,12+4)
-    plt.hist(corr_mad_cov, bins = nbins)
-    plt.xlabel('Corr mad-cov')
-    plt.ylabel('Counts')
-    plt.show()
-
-# Let's have a look at the raw values of mean, std and cov
-
-plt.figure()
-plt.boxplot(np.hstack((feat_mean.flatten()[:,np.newaxis], feat_std.flatten()[:,np.newaxis], feat_cov.flatten()[:,np.newaxis])))
-plt.show()
-
-plt.figure()
-plt.subplot(1,3,1)
-plt.hist(feat_mean.flatten(), bins=20)
-plt.subplot(1,3,2)
-plt.hist(feat_std.flatten(), bins=20)
-plt.subplot(1,3,3)
-plt.hist(feat_cov.flatten(), bins=20)
-plt.suptitle('Histogram of raw values')
-plt.show()
-
-# Now represent pair-wise correlation individually within each type of feature
-R_mean = np.corrcoef(feat_mean, rowvar=False)
-R_std = np.corrcoef(feat_std, rowvar=False)
-R_cov = np.corrcoef(feat_cov, rowvar=False)
-mask=np.triu(np.ones((n,n),dtype=bool),k=1)
-
-plt.figure()
-plt.subplot(1,3,1)
-plt.hist(R_mean[mask], bins=20)
-plt.subplot(1,3,2)
-plt.hist(R_std[mask], bins=20)
-plt.subplot(1,3,3)
-plt.hist(R_cov[mask], bins=20)
-plt.suptitle('Histogram of pair-wise correlation values')
-plt.show()
+    import eda
+    reload(eda)
+    eda.eda(X, n)
 
 # Given the previous analysis, remove median and mad variables
 # X = np.hstack((X[:,0:n*2], X[:,4*n:5*n]))
@@ -216,11 +54,11 @@ prctile = 95
 nfeats_limit = int(round((100-prctile)*1.0/100*nfeats))
 check = False
 scaling = False
-doPCA = False
 
 importance_scores = np.zeros((NUM_TRIALS * nfolds, nfeats)) # store the importance of each feature across repetitions
 
 # --- select the classifier
+
 # from sklearn.svm import SVC, LinearSVC
 # from sklearn.model_selection import GridSearchCV
 # param_grid = [
@@ -229,13 +67,9 @@ importance_scores = np.zeros((NUM_TRIALS * nfolds, nfeats)) # store the importan
 # # clf = SVC(C = 1, random_state = 1, class_weight = 'balanced')  # gaussian kernel with C=1 and sigma=1/num_features
 # clf=GridSearchCV(SVC(random_state = 1, class_weight = 'balanced'), param_grid = param_grid, cv = 5, n_jobs = -1)
 
-# from sklearn.ensemble import RandomForestClassifier
-# clf = RandomForestClassifier(n_estimators=100, random_state=1, class_weight = 'balanced')
-
 from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
 # clf = LogisticRegression(C=1, penalty='l2', random_state=1, class_weight='balanced')
 clf = LogisticRegressionCV(Cs = np.logspace(1e-4,1,5), penalty='l2', cv = 5, scoring='roc_auc', random_state=1, class_weight='balanced', n_jobs = -1)
-
 
 
 # ---
@@ -283,19 +117,6 @@ for itrial in np.arange(NUM_TRIALS):
             scaler=preprocessing.StandardScaler().fit(training_samples)
             training_samples = scaler.transform(training_samples)
             test_samples = scaler.transform(test_samples)
-
-        # perform pca
-        if doPCA:
-            from sklearn.decomposition import PCA
-            ncomp = 100
-            pca = PCA(n_components=ncomp)
-            training_samples = training_samples[:, np.where(importance != 0)[0]]
-            test_samples = test_samples[:, np.where(importance != 0)[0]]
-            pca.fit(training_samples)
-            training_samples = pca.transform(training_samples)
-            test_samples = pca.transform(test_samples)
-            nfeats_limit = ncomp
-            ranking = np.arange(ncomp)
 
 
         for i in range(nfeats_limit): # this for loop implements a recursive feature selection procedure
