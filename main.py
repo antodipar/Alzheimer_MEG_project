@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 plt.ioff() # turn the interactive mode off
 import numpy as np
 import pandas as pd
-import math
+
 
 # load data
 Data = pd.read_csv('meg_mci.csv')
@@ -163,14 +163,42 @@ if flag:
     plt.ylabel('Counts')
     plt.show()
 
-# Given the previous analysis, remove median and mad variables
-X = np.hstack((X[:,0:n*2], X[:,4*n:5*n]))
-
-# preprocess data? Let's have a look at the raw values of mean, std and cov
+# Let's have a look at the raw values of mean, std and cov
 
 plt.figure()
 plt.boxplot(np.hstack((feat_mean.flatten()[:,np.newaxis], feat_std.flatten()[:,np.newaxis], feat_cov.flatten()[:,np.newaxis])))
 plt.show()
+
+plt.figure()
+plt.subplot(1,3,1)
+plt.hist(feat_mean.flatten(), bins=20)
+plt.subplot(1,3,2)
+plt.hist(feat_std.flatten(), bins=20)
+plt.subplot(1,3,3)
+plt.hist(feat_cov.flatten(), bins=20)
+plt.suptitle('Histogram of raw values')
+plt.show()
+
+# Now represent pair-wise correlation individually within each type of feature
+R_mean = np.corrcoef(feat_mean, rowvar=False)
+R_std = np.corrcoef(feat_std, rowvar=False)
+R_cov = np.corrcoef(feat_cov, rowvar=False)
+mask=np.triu(np.ones((n,n),dtype=bool),k=1)
+
+plt.figure()
+plt.subplot(1,3,1)
+plt.hist(R_mean[mask], bins=20)
+plt.subplot(1,3,2)
+plt.hist(R_std[mask], bins=20)
+plt.subplot(1,3,3)
+plt.hist(R_cov[mask], bins=20)
+plt.suptitle('Histogram of pair-wise correlation values')
+plt.show()
+
+# Given the previous analysis, remove median and mad variables
+# X = np.hstack((X[:,0:n*2], X[:,4*n:5*n]))
+X = X[:,0:n]
+
 
 # *******************************************
 # *******************************************
@@ -185,20 +213,30 @@ nfolds = 10 # 10-fold cross-validation
 NUM_TRIALS = 1 # 10-repeated 10-fold cross-validation
 nsamples, nfeats = X.shape
 prctile = 95
-scaling = True
-doPCA = True
+nfeats_limit = int(round((100-prctile)*1.0/100*nfeats))
+check = False
+scaling = False
+doPCA = False
 
 importance_scores = np.zeros((NUM_TRIALS * nfolds, nfeats)) # store the importance of each feature across repetitions
 
 # --- select the classifier
 # from sklearn.svm import SVC, LinearSVC
-# clf = SVC(C = 1, random_state = 1, class_weight = 'balanced')  # gaussian kernel with C=1 and sigma=1/num_features
+# from sklearn.model_selection import GridSearchCV
+# param_grid = [
+#     {'C': [1e-1, 1, 10, 100], 'gamma': [0.001, 0.0001], 'kernel': ['rbf']},
+#  ]
+# # clf = SVC(C = 1, random_state = 1, class_weight = 'balanced')  # gaussian kernel with C=1 and sigma=1/num_features
+# clf=GridSearchCV(SVC(random_state = 1, class_weight = 'balanced'), param_grid = param_grid, cv = 5, n_jobs = -1)
 
 # from sklearn.ensemble import RandomForestClassifier
 # clf = RandomForestClassifier(n_estimators=100, random_state=1, class_weight = 'balanced')
 
-from sklearn.linear_model import LogisticRegression
-clf = LogisticRegression(C=1, penalty='l1', random_state=1, class_weight='balanced')
+from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
+# clf = LogisticRegression(C=1, penalty='l2', random_state=1, class_weight='balanced')
+clf = LogisticRegressionCV(Cs = np.logspace(1e-4,1,5), penalty='l2', cv = 5, scoring='roc_auc', random_state=1, class_weight='balanced', n_jobs = -1)
+
+
 
 # ---
 
@@ -228,14 +266,16 @@ for itrial in np.arange(NUM_TRIALS):
 
         # compute feature ranking
         import feature_importance as fi
+        reload(fi)
 
-        importance = fi.acc(training_samples, training_labels, clf)
-        thr = np.percentile(importance, prctile)
-        importance[np.where(importance < thr)[0]] = 0
-        nfeats_limit = len(np.where(importance != 0)[0])
-        importance_scores[itrial * nfolds + icv, :] = importance
+        importance = fi.wilcoxon(training_samples, training_labels)
         ranking = np.argsort(importance)
         ranking = ranking[::-1]
+        importance[ranking[nfeats_limit:]] = 0
+        importance_scores[itrial * nfolds + icv, :] = importance
+        if len(np.where(importance!=0)[0]) != nfeats_limit:
+            print "WARNING"*5
+            check = True
 
         # preprocess the data
         if scaling:
@@ -273,13 +313,13 @@ for itrial in np.arange(NUM_TRIALS):
             fpr, tpr, thr = roc_curve(y_true, y_scores)
             FPR[itrial * nfolds + icv, i] = list(fpr)
             TPR[itrial * nfolds + icv, i] = list(tpr)
-            test_AUC[itrial * nfolds + icv, i] = clf.score(test_samples[:, ranking[0:i + 1]], test_labels) # roc_auc_score(y_true, y_scores)
+            test_AUC[itrial * nfolds + icv, i] = roc_auc_score(y_true, y_scores)
             # --- test the model on the training samples too
             y_scores = clf.decision_function(training_samples[:, ranking[0:i + 1]])
             # y_scores = clf.predict_proba(training_samples[:, ranking[0:i + 1]])[:,1]
             y_true = training_labels
             fpr, tpr, thr = roc_curve(y_true, y_scores)
-            training_AUC[itrial * nfolds + icv, i] = clf.score(training_samples[:, ranking[0:i + 1]], training_labels) # roc_auc_score(y_true, y_scores)
+            training_AUC[itrial * nfolds + icv, i] = roc_auc_score(y_true, y_scores)
 
 
 
@@ -313,11 +353,11 @@ training_auc_lower = mean_training_auc - std_training_auc
 max_indx = np.argmax(mean_test_auc) # 'max_indx + 1' is the optimal number of features to be used for diagnosis
 print "\nMax Auc %g (sd: %g) with %u features" % (mean_test_auc[max_indx], std_test_auc[max_indx], max_indx + 1)
 plt.figure()
-plt.plot(np.arange(1, nfeats + 1), mean_test_auc, color='b', lw=2, label="Meant Test AUC")
+plt.plot(np.arange(1, nfeats + 1), mean_test_auc, color='b', lw=2, label="Mean Test AUC")
 plt.fill_between(np.arange(1,nfeats+1), test_auc_lower, test_auc_upper, color='grey', alpha=.2, label=r'$\pm$ 1 SD.')
 
 plt.plot(np.arange(1, nfeats + 1), mean_training_auc, color='g', lw=2, label="Mean Training AUC")
-plt.fill_between(np.arange(1,nfeats+1), training_auc_lower, training_auc_upper, color='grey', alpha=.2, label=r'$\pm$ 1 SD.')
+plt.fill_between(np.arange(1,nfeats+1), training_auc_lower, training_auc_upper, color='red', alpha=.2, label=r'$\pm$ 1 SD.')
 
 plt.scatter(max_indx+1, mean_test_auc[max_indx], color='k', marker="D", linewidths=1, alpha=1, zorder=5, label="Max AUC")
 plt.xlabel('Number of features')
