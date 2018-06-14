@@ -24,7 +24,7 @@ Y = data[:,1] > 1
 # *******************************************
 # *******************************************
 
-doEda = True
+doEda = False
 n = 5151  # total number of features: 5151 x 5 = 25.755
 
 if doEda:
@@ -50,10 +50,10 @@ X = X[:,0:n]
 nfolds = 10 # 10-fold cross-validation
 NUM_TRIALS = 1 # 10-repeated 10-fold cross-validation
 nsamples, nfeats = X.shape
-prctile = 95
+prctile = 85
 nfeats_limit = int(round((100-prctile)*1.0/100*nfeats))
-check = False
-scaling = False
+check = False # to ensure that the number of relevant features is the same across iterations
+scaling = False # feature scaling?
 
 importance_scores = np.zeros((NUM_TRIALS * nfolds, nfeats)) # store the importance of each feature across repetitions
 
@@ -68,8 +68,8 @@ importance_scores = np.zeros((NUM_TRIALS * nfolds, nfeats)) # store the importan
 # clf=GridSearchCV(SVC(random_state = 1, class_weight = 'balanced'), param_grid = param_grid, cv = 5, n_jobs = -1)
 
 from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
-# clf = LogisticRegression(C=1, penalty='l2', random_state=1, class_weight='balanced')
-clf = LogisticRegressionCV(Cs = np.logspace(1e-4,1,5), penalty='l2', cv = 5, scoring='roc_auc', random_state=1, class_weight='balanced', n_jobs = -1)
+clf = LogisticRegression(C=1, penalty='l2', random_state=1, class_weight='balanced')
+# clf = LogisticRegressionCV(Cs = np.logspace(1e-4,1,5), penalty='l2', cv = 5, scoring='roc_auc', random_state=1, class_weight='balanced', n_jobs = -1)
 
 
 # ---
@@ -79,13 +79,16 @@ FPR = dict()
 TPR = dict()
 test_AUC = np.zeros((NUM_TRIALS*nfolds, nfeats))
 training_AUC = np.zeros((NUM_TRIALS*nfolds, nfeats)) # to have an idea about overfitting
+# other metrics to evaluate the classification performance
+test_ACC = np.zeros((NUM_TRIALS*nfolds, nfeats))
+test_F1 = np.zeros((NUM_TRIALS*nfolds, nfeats))
 
 # start the cross-validation procedure
 for itrial in np.arange(NUM_TRIALS):
 
     print "Trial {} (out of {})".format(itrial+1,NUM_TRIALS)
 
-    # split the dataset into 10 folds (9 for training and 1 for testing)
+    # split the dataset into nfols
     from sklearn.model_selection import StratifiedKFold
     skf = StratifiedKFold(n_splits = nfolds, shuffle = True, random_state = itrial)
 
@@ -126,22 +129,23 @@ for itrial in np.arange(NUM_TRIALS):
 
             # --- train the model using the training folds
             clf.fit(training_samples[:, ranking[0:i + 1]], training_labels)
+
             # --- test the model in the remaining fold and compute the ROC curve
-            from sklearn.metrics import roc_auc_score, roc_curve
+            from sklearn.metrics import roc_auc_score, roc_curve, f1_score
             y_scores = clf.decision_function( test_samples[:, ranking[0:i + 1]] )
-            # y_scores = clf.predict_proba( test_samples[:, ranking[0:i + 1]] )[:,1]
+            y_predict = clf.predict(test_samples[:, ranking[0:i + 1]])
             y_true = test_labels
             fpr, tpr, thr = roc_curve(y_true, y_scores)
             FPR[itrial * nfolds + icv, i] = list(fpr)
             TPR[itrial * nfolds + icv, i] = list(tpr)
             test_AUC[itrial * nfolds + icv, i] = roc_auc_score(y_true, y_scores)
+            test_ACC[itrial * nfolds + icv, i] = clf.score(test_samples[:, ranking[0:i + 1]], y_true)
+            test_F1[itrial * nfolds + icv, i] = f1_score(y_true, y_predict)
+
             # --- test the model on the training samples too
             y_scores = clf.decision_function(training_samples[:, ranking[0:i + 1]])
-            # y_scores = clf.predict_proba(training_samples[:, ranking[0:i + 1]])[:,1]
             y_true = training_labels
-            fpr, tpr, thr = roc_curve(y_true, y_scores)
             training_AUC[itrial * nfolds + icv, i] = roc_auc_score(y_true, y_scores)
-
 
 
         icv += 1
@@ -174,6 +178,7 @@ training_auc_lower = mean_training_auc - std_training_auc
 max_indx = np.argmax(mean_test_auc) # 'max_indx + 1' is the optimal number of features to be used for diagnosis
 print "\nMax Auc %g (sd: %g) with %u features" % (mean_test_auc[max_indx], std_test_auc[max_indx], max_indx + 1)
 plt.figure()
+
 plt.plot(np.arange(1, nfeats + 1), mean_test_auc, color='b', lw=2, label="Mean Test AUC")
 plt.fill_between(np.arange(1,nfeats+1), test_auc_lower, test_auc_upper, color='grey', alpha=.2, label=r'$\pm$ 1 SD.')
 
@@ -183,6 +188,23 @@ plt.fill_between(np.arange(1,nfeats+1), training_auc_lower, training_auc_upper, 
 plt.scatter(max_indx+1, mean_test_auc[max_indx], color='k', marker="D", linewidths=1, alpha=1, zorder=5, label="Max AUC")
 plt.xlabel('Number of features')
 plt.ylabel('AUC')
+plt.legend(loc="lower right")
+plt.grid(True)
+plt.xlim([-2, nfeats+2])
+plt.ylim([0, 1.1])
+plt.show()
+
+# visualiza auc, acc and f1 only in the test dataset
+mean_test_acc = np.mean(test_ACC, 0)
+mean_test_f1 = np.mean(test_F1, 0)
+
+plt.figure()
+plt.plot(np.arange(1, nfeats + 1), mean_test_auc, color='b', lw=2, label="Mean Test AUC")
+plt.plot(np.arange(1, nfeats + 1), mean_test_acc, color='g', lw=2, label="Mean Test ACC")
+plt.plot(np.arange(1, nfeats + 1), mean_test_f1, color='k', lw=2, label="Mean Test F1")
+
+plt.xlabel('Number of features')
+plt.ylabel('Performance')
 plt.legend(loc="lower right")
 plt.grid(True)
 plt.xlim([-2, nfeats+2])
