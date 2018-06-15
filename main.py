@@ -19,7 +19,7 @@ Y = data[:,1] > 1
 # *******************************************
 # *******************************************
 # *******************************************
-# exploratory data analysis
+# Exploratory data analysis
 # *******************************************
 # *******************************************
 # *******************************************
@@ -31,7 +31,7 @@ if doEda:
 
     import eda
     reload(eda)
-    eda.eda(X, n)
+    eda.edges(X, n)
 
 # Given the previous analysis, remove median and mad variables
 # X = np.hstack((X[:,0:n*2], X[:,4*n:5*n]))
@@ -41,19 +41,72 @@ X = X[:,0:n]
 # *******************************************
 # *******************************************
 # *******************************************
+# Network reconstruction
+# *******************************************
+# *******************************************
+# *******************************************
+nsamples, nfeats = X.shape
+nROIs = 102
+NETS = np.zeros((nsamples, nROIs, nROIs)) # variable to store subject-specific networks
+mask = np.triu(np.ones((nROIs, nROIs), dtype=bool), k=1)
+for isubj, W in enumerate(NETS):
+
+    links = X[isubj,:]
+    W[mask] = links
+    NETS[isubj,:] = W + W.T
+
+
+# *******************************************
+# *******************************************
+# *******************************************
+# Feature extraction based on network measures
+# *******************************************
+# *******************************************
+# *******************************************
+import network_analysis as netanalysis
+reload(netanalysis)
+
+densities = [20]
+newX = np.zeros((nsamples, nROIs * len(densities) * 4))
+
+for isubj in np.arange(nsamples):
+
+    print "Subject {} (out of {})".format(isubj+1, nsamples)
+    thr_nets = netanalysis.thresholding(NETS[isubj], densities)
+    metrics = netanalysis.compute_metrics(thr_nets)
+    newX[isubj] = metrics
+
+X = newX
+
+# save data
+import pickle
+fout=open('data.txt', 'w')
+pickle.dump([X,Y], fout)
+fout.close()
+
+# # read from disk
+# import pickle
+# fin=open('data.txt', 'r')
+# X,Y=pickle.load(fin)
+# fin.close()
+
+
+# *******************************************
+# *******************************************
+# *******************************************
 # Select model and estimate classification performance using cross-validation
 # *******************************************
 # *******************************************
 # *******************************************
+# Now we have a new set of features
+nsamples, nfeats = X.shape
 
 # initialize variables
 nfolds = 10 # 10-fold cross-validation
 NUM_TRIALS = 1 # 10-repeated 10-fold cross-validation
-nsamples, nfeats = X.shape
-prctile = 85
-nfeats_limit = int(round((100-prctile)*1.0/100*nfeats))
-check = False # to ensure that the number of relevant features is the same across iterations
-scaling = False # feature scaling?
+prct = 100 # percentage of features to be used
+nfeats_limit = int(round(prct*1.0/100*nfeats))
+scaling = True # feature scaling?
 
 importance_scores = np.zeros((NUM_TRIALS * nfolds, nfeats)) # store the importance of each feature across repetitions
 
@@ -62,15 +115,17 @@ importance_scores = np.zeros((NUM_TRIALS * nfolds, nfeats)) # store the importan
 # from sklearn.svm import SVC, LinearSVC
 # from sklearn.model_selection import GridSearchCV
 # param_grid = [
-#     {'C': [1e-1, 1, 10, 100], 'gamma': [0.001, 0.0001], 'kernel': ['rbf']},
+#     {'C': [1, 10, 100], 'gamma': [0.001, 0.0001], 'kernel': ['rbf']},
 #  ]
-# # clf = SVC(C = 1, random_state = 1, class_weight = 'balanced')  # gaussian kernel with C=1 and sigma=1/num_features
 # clf=GridSearchCV(SVC(random_state = 1, class_weight = 'balanced'), param_grid = param_grid, cv = 5, n_jobs = -1)
+# # clf = SVC(C = 1, random_state = 1, class_weight = 'balanced')  # gaussian kernel with C=1 and sigma=1/num_features
 
 from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
-clf = LogisticRegression(C=1, penalty='l2', random_state=1, class_weight='balanced')
+clf = LogisticRegression(C=1e-2, penalty='l2', random_state=1, class_weight='balanced')
 # clf = LogisticRegressionCV(Cs = np.logspace(1e-4,1,5), penalty='l2', cv = 5, scoring='roc_auc', random_state=1, class_weight='balanced', n_jobs = -1)
 
+# from sklearn.ensemble import RandomForestClassifier
+# clf = RandomForestClassifier(n_estimators=100, class_weight = 'balanced', random_state=1)
 
 # ---
 
@@ -90,7 +145,7 @@ for itrial in np.arange(NUM_TRIALS):
 
     # split the dataset into nfols
     from sklearn.model_selection import StratifiedKFold
-    skf = StratifiedKFold(n_splits = nfolds, shuffle = True, random_state = itrial)
+    skf = StratifiedKFold(n_splits = nfolds, shuffle = True, random_state = itrial+1)
 
     icv = 0
     for indxtrain, indxtest in skf.split(X, Y):
@@ -108,11 +163,8 @@ for itrial in np.arange(NUM_TRIALS):
         importance = fi.wilcoxon(training_samples, training_labels)
         ranking = np.argsort(importance)
         ranking = ranking[::-1]
-        importance[ranking[nfeats_limit:]] = 0
         importance_scores[itrial * nfolds + icv, :] = importance
-        if len(np.where(importance!=0)[0]) != nfeats_limit:
-            print "WARNING"*5
-            check = True
+
 
         # preprocess the data
         if scaling:
@@ -132,7 +184,8 @@ for itrial in np.arange(NUM_TRIALS):
 
             # --- test the model in the remaining fold and compute the ROC curve
             from sklearn.metrics import roc_auc_score, roc_curve, f1_score
-            y_scores = clf.decision_function( test_samples[:, ranking[0:i + 1]] )
+            # y_scores = clf.decision_function( test_samples[:, ranking[0:i + 1]] )
+            y_scores = clf.predict_proba(test_samples[:, ranking[0:i + 1]])[:,1]
             y_predict = clf.predict(test_samples[:, ranking[0:i + 1]])
             y_true = test_labels
             fpr, tpr, thr = roc_curve(y_true, y_scores)
@@ -143,7 +196,8 @@ for itrial in np.arange(NUM_TRIALS):
             test_F1[itrial * nfolds + icv, i] = f1_score(y_true, y_predict)
 
             # --- test the model on the training samples too
-            y_scores = clf.decision_function(training_samples[:, ranking[0:i + 1]])
+            # y_scores = clf.decision_function(training_samples[:, ranking[0:i + 1]])
+            y_scores = clf.predict_proba(training_samples[:, ranking[0:i + 1]])[:,1]
             y_true = training_labels
             training_AUC[itrial * nfolds + icv, i] = roc_auc_score(y_true, y_scores)
 

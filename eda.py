@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def eda(X,n):
+def edges(X,n):
 
 
     feat_mean = X[0:, 0:n]
