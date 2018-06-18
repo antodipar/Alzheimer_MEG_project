@@ -25,7 +25,7 @@ Y = data[:,1] > 1
 # *******************************************
 
 doEda = False
-n = 5151  # total number of features: 5151 x 5 = 25.755
+n = 5151  # # total number of links: 5151. Total number of features: 5151 x 5 = 25.755
 
 if doEda:
 
@@ -45,52 +45,52 @@ X = X[:,0:n]
 # *******************************************
 # *******************************************
 # *******************************************
-nsamples, nfeats = X.shape
-nROIs = 102
-NETS = np.zeros((nsamples, nROIs, nROIs)) # variable to store subject-specific networks
-mask = np.triu(np.ones((nROIs, nROIs), dtype=bool), k=1)
-for isubj in np.arange(nsamples):
+doNet = False
 
-    links = X[isubj,:]
-    W = NETS[isubj].copy()
-    W[mask] = links
-    NETS[isubj,:] = W + W.T
+if doNet:
+
+    nsamples, nfeats = X.shape
+    nROIs = 102
+    NETS = np.zeros((nsamples, nROIs, nROIs)) # variable to store subject-specific networks
+    mask = np.triu(np.ones((nROIs, nROIs), dtype=bool), k=1)
+    for isubj in np.arange(nsamples):
+
+        links = X[isubj,:]
+        W = NETS[isubj].copy()
+        W[mask] = links
+        NETS[isubj,:] = W + W.T
 
 
-# *******************************************
-# *******************************************
-# *******************************************
-# Feature extraction based on network measures
-# *******************************************
-# *******************************************
-# *******************************************
-import network_analysis as netanalysis
-reload(netanalysis)
 
-# densities = [40, 60, 80]
-# nofmetrics = 5 # degree, closeness, ...
-# newX = np.zeros((nsamples, nROIs * len(densities) * nofmetrics))
-#
-# for isubj in np.arange(nsamples):
-#
-#     print "Subject {} (out of {})".format(isubj+1, nsamples)
-#     thr_nets = netanalysis.thresholding(NETS[isubj], densities)
-#     metrics = netanalysis.compute_metrics(thr_nets)
-#     newX[isubj] = metrics
-#
-# X = newX
-#
-# # save data
-# import pickle
-# fout=open('data.txt', 'w')
-# pickle.dump([X,Y], fout)
-# fout.close()
+    # Feature extraction based on network measures
 
-# read from disk
-import pickle
-fin=open('data.txt', 'r')
-X,Y=pickle.load(fin)
-fin.close()
+    import network_analysis as netanalysis
+    reload(netanalysis)
+
+    # densities = [40, 60, 80]
+    # nofmetrics = 5 # degree, closeness, ...
+    # newX = np.zeros((nsamples, nROIs * len(densities) * nofmetrics))
+    #
+    # for isubj in np.arange(nsamples):
+    #
+    #     print "Subject {} (out of {})".format(isubj+1, nsamples)
+    #     thr_nets = netanalysis.thresholding(NETS[isubj], densities)
+    #     metrics = netanalysis.compute_metrics(thr_nets)
+    #     newX[isubj] = metrics
+    #
+    # X = newX
+    #
+    # # save data
+    # import pickle
+    # fout=open('data.txt', 'w')
+    # pickle.dump([X,Y], fout)
+    # fout.close()
+
+    # read from disk
+    import pickle
+    fin=open('data.txt', 'r')
+    X,Y=pickle.load(fin)
+    fin.close()
 
 
 # *******************************************
@@ -100,13 +100,13 @@ fin.close()
 # *******************************************
 # *******************************************
 # *******************************************
-# Now we have a new set of features
+# Now we have a new set of features (if doNet is True)
 nsamples, nfeats = X.shape
 
 # initialize variables
 nfolds = 10 # 10-fold cross-validation
 NUM_TRIALS = 1 # 10-repeated 10-fold cross-validation
-prct = 50 # percentage of features to be used
+prct = 20 # percentage of features to be used
 nfeats_limit = int(round(prct*1.0/100*nfeats))
 scaling = True # feature scaling?
 
@@ -266,3 +266,5 @@ plt.grid(True)
 plt.xlim([-2, nfeats+2])
 plt.ylim([0, 1.1])
 plt.show()
+
+# HI, THIS IS A TEST
