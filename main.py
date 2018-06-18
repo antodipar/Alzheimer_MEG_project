@@ -3,7 +3,6 @@
 
 # import basic modules
 import matplotlib.pyplot as plt
-plt.ioff() # turn the interactive mode off
 import numpy as np
 import pandas as pd
 
@@ -20,180 +19,19 @@ Y = data[:,1] > 1
 # *******************************************
 # *******************************************
 # *******************************************
-# exploratory data analysis
+# Exploratory data analysis
 # *******************************************
 # *******************************************
 # *******************************************
 
-flag = False
+doEda = False
 n = 5151  # total number of features: 5151 x 5 = 25.755
-feat_mean = X[:, 0:n]
-feat_std = X[:, n:2*n]
-feat_median = X[:, 2*n:3*n]
-feat_mad = X[:, 3*n:4*n]
-feat_cov = X[:, 4*n:5*n]
 
-if flag:
+if doEda:
 
-
-    # compute pair-wise correlation to uncover linear dependencies
-
-    # Mean & std
-    corr_mean_std = np.zeros((n))
-    for i in np.arange(n):
-        corr_mean_std[i] = np.corrcoef(feat_mean[:,i], feat_std[:,i], rowvar = False)[0,1]
-
-    # Mean & median
-    corr_mean_median = np.zeros((n))
-    for i in np.arange(n):
-        corr_mean_median[i] = np.corrcoef(feat_mean[:,i], feat_median[:,i], rowvar = False)[0,1]
-
-    # Mean & mad
-    corr_mean_mad = np.zeros((n))
-    for i in np.arange(n):
-        corr_mean_mad[i] = np.corrcoef(feat_mean[:,i], feat_mad[:,i], rowvar = False)[0,1]
-
-    # Mean & cov
-    corr_mean_cov = np.zeros((n))
-    for i in np.arange(n):
-        corr_mean_cov[i] = np.corrcoef(feat_mean[:,i], feat_cov[:,i], rowvar = False)[0,1]
-
-    # Std & median
-    corr_std_median = np.zeros((n))
-    for i in np.arange(n):
-        corr_std_median[i] = np.corrcoef(feat_std[:,i], feat_median[:,i], rowvar = False)[0,1]
-
-    # Std & mad
-    corr_std_mad = np.zeros((n))
-    for i in np.arange(n):
-        corr_std_mad[i] = np.corrcoef(feat_std[:,i], feat_mad[:,i], rowvar = False)[0,1]
-
-    # Std & cov
-    corr_std_cov = np.zeros((n))
-    for i in np.arange(n):
-        corr_std_cov[i] = np.corrcoef(feat_std[:,i], feat_cov[:,i], rowvar = False)[0,1]
-
-    # Median & mad
-    corr_median_mad = np.zeros((n))
-    for i in np.arange(n):
-        corr_median_mad[i] = np.corrcoef(feat_median[:,i], feat_mad[:,i], rowvar = False)[0,1]
-
-    # Median & cov
-    corr_median_cov = np.zeros((n))
-    for i in np.arange(n):
-        corr_median_cov[i] = np.corrcoef(feat_median[:,i], feat_cov[:,i], rowvar = False)[0,1]
-
-    # Mad & cov
-    corr_mad_cov = np.zeros((n))
-    for i in np.arange(n):
-        corr_mad_cov[i] = np.corrcoef(feat_mad[:,i], feat_cov[:,i], rowvar = False)[0,1]
-
-    # Visualize data
-
-    # Mean & std
-    nbins = 20
-
-    plt.figure()
-    plt.subplot(4,4,1)
-    plt.hist(corr_mean_std, bins = nbins)
-    plt.xlabel('Corr mean-std')
-    plt.ylabel('Counts')
-    plt.show()
-
-    # Mean & median
-    plt.subplot(4,4,2)
-    plt.hist(corr_mean_median, bins = nbins)
-    # plt.xlabel('Corr mean-median')
-    # plt.ylabel('Counts')
-    plt.show()
-
-    # Mean & mad
-    plt.subplot(4,4,3)
-    plt.hist(corr_mean_mad, bins = nbins)
-    # plt.xlabel('Corr mean-mad')
-    # plt.ylabel('Counts')
-    plt.show()
-
-    # Mean & cov
-    plt.subplot(4,4,4)
-    plt.hist(corr_mean_cov, bins = nbins)
-    # plt.xlabel('Corr mean-cov')
-    # plt.ylabel('Counts')
-    plt.show()
-
-    # Std & median
-    plt.subplot(4,4,4+2)
-    plt.hist(corr_std_median, bins = nbins)
-    plt.xlabel('Corr std-median')
-    plt.ylabel('Counts')
-    plt.show()
-
-    # Std & mad
-    plt.subplot(4,4,4+3)
-    plt.hist(corr_std_mad, bins = nbins)
-    # plt.xlabel('Corr std-mad')
-    # plt.ylabel('Counts')
-    plt.show()
-
-    # Std & cov
-    plt.subplot(4,4,4+4)
-    plt.hist(corr_std_cov, bins = nbins)
-    # plt.xlabel('Corr std-cov')
-    # plt.ylabel('Counts')
-    plt.show()
-
-    # Median & mad
-    plt.subplot(4,4,8+3)
-    plt.hist(corr_median_mad, bins = nbins)
-    plt.xlabel('Corr median-mad')
-    plt.ylabel('Counts')
-    plt.show()
-
-    # Median & cov
-    plt.subplot(4,4,8+4)
-    plt.hist(corr_median_cov, bins = nbins)
-    # plt.xlabel('Corr median-cov')
-    # plt.ylabel('Counts')
-    plt.show()
-
-    # Mad & cov
-    plt.subplot(4,4,12+4)
-    plt.hist(corr_mad_cov, bins = nbins)
-    plt.xlabel('Corr mad-cov')
-    plt.ylabel('Counts')
-    plt.show()
-
-# Let's have a look at the raw values of mean, std and cov
-
-plt.figure()
-plt.boxplot(np.hstack((feat_mean.flatten()[:,np.newaxis], feat_std.flatten()[:,np.newaxis], feat_cov.flatten()[:,np.newaxis])))
-plt.show()
-
-plt.figure()
-plt.subplot(1,3,1)
-plt.hist(feat_mean.flatten(), bins=20)
-plt.subplot(1,3,2)
-plt.hist(feat_std.flatten(), bins=20)
-plt.subplot(1,3,3)
-plt.hist(feat_cov.flatten(), bins=20)
-plt.suptitle('Histogram of raw values')
-plt.show()
-
-# Now represent pair-wise correlation individually within each type of feature
-R_mean = np.corrcoef(feat_mean, rowvar=False)
-R_std = np.corrcoef(feat_std, rowvar=False)
-R_cov = np.corrcoef(feat_cov, rowvar=False)
-mask=np.triu(np.ones((n,n),dtype=bool),k=1)
-
-plt.figure()
-plt.subplot(1,3,1)
-plt.hist(R_mean[mask], bins=20)
-plt.subplot(1,3,2)
-plt.hist(R_std[mask], bins=20)
-plt.subplot(1,3,3)
-plt.hist(R_cov[mask], bins=20)
-plt.suptitle('Histogram of pair-wise correlation values')
-plt.show()
+    import eda
+    reload(eda)
+    eda.edges(X, n)
 
 # Given the previous analysis, remove median and mad variables
 # X = np.hstack((X[:,0:n*2], X[:,4*n:5*n]))
@@ -203,40 +41,93 @@ X = X[:,0:n]
 # *******************************************
 # *******************************************
 # *******************************************
+# Network reconstruction
+# *******************************************
+# *******************************************
+# *******************************************
+nsamples, nfeats = X.shape
+nROIs = 102
+NETS = np.zeros((nsamples, nROIs, nROIs)) # variable to store subject-specific networks
+mask = np.triu(np.ones((nROIs, nROIs), dtype=bool), k=1)
+for isubj in np.arange(nsamples):
+
+    links = X[isubj,:]
+    W = NETS[isubj].copy()
+    W[mask] = links
+    NETS[isubj,:] = W + W.T
+
+
+# *******************************************
+# *******************************************
+# *******************************************
+# Feature extraction based on network measures
+# *******************************************
+# *******************************************
+# *******************************************
+import network_analysis as netanalysis
+reload(netanalysis)
+
+# densities = [40, 60, 80]
+# nofmetrics = 5 # degree, closeness, ...
+# newX = np.zeros((nsamples, nROIs * len(densities) * nofmetrics))
+#
+# for isubj in np.arange(nsamples):
+#
+#     print "Subject {} (out of {})".format(isubj+1, nsamples)
+#     thr_nets = netanalysis.thresholding(NETS[isubj], densities)
+#     metrics = netanalysis.compute_metrics(thr_nets)
+#     newX[isubj] = metrics
+#
+# X = newX
+#
+# # save data
+# import pickle
+# fout=open('data.txt', 'w')
+# pickle.dump([X,Y], fout)
+# fout.close()
+
+# read from disk
+import pickle
+fin=open('data.txt', 'r')
+X,Y=pickle.load(fin)
+fin.close()
+
+
+# *******************************************
+# *******************************************
+# *******************************************
 # Select model and estimate classification performance using cross-validation
 # *******************************************
 # *******************************************
 # *******************************************
+# Now we have a new set of features
+nsamples, nfeats = X.shape
 
 # initialize variables
 nfolds = 10 # 10-fold cross-validation
 NUM_TRIALS = 1 # 10-repeated 10-fold cross-validation
-nsamples, nfeats = X.shape
-prctile = 95
-nfeats_limit = int(round((100-prctile)*1.0/100*nfeats))
-check = False
-scaling = False
-doPCA = False
+prct = 50 # percentage of features to be used
+nfeats_limit = int(round(prct*1.0/100*nfeats))
+scaling = True # feature scaling?
 
 importance_scores = np.zeros((NUM_TRIALS * nfolds, nfeats)) # store the importance of each feature across repetitions
 
 # --- select the classifier
+
 # from sklearn.svm import SVC, LinearSVC
 # from sklearn.model_selection import GridSearchCV
 # param_grid = [
-#     {'C': [1e-1, 1, 10, 100], 'gamma': [0.001, 0.0001], 'kernel': ['rbf']},
+#     {'C': [1, 10, 100], 'gamma': [0.001, 0.0001], 'kernel': ['rbf']},
 #  ]
-# # clf = SVC(C = 1, random_state = 1, class_weight = 'balanced')  # gaussian kernel with C=1 and sigma=1/num_features
 # clf=GridSearchCV(SVC(random_state = 1, class_weight = 'balanced'), param_grid = param_grid, cv = 5, n_jobs = -1)
+# clf = SVC(C = 1, random_state = 1, class_weight = 'balanced')  # gaussian kernel with C=1 and sigma=1/num_features
 
-# from sklearn.ensemble import RandomForestClassifier
-# clf = RandomForestClassifier(n_estimators=100, random_state=1, class_weight = 'balanced')
+# from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
+# clf = LogisticRegression(C=1, penalty='l1', random_state=1, class_weight='balanced')
+# clf = LogisticRegressionCV(Cs = np.logspace(1e-4,1,5), penalty='l2', cv = 5, scoring='roc_auc', random_state=1, class_weight='balanced', n_jobs = -1)
 
-from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
-# clf = LogisticRegression(C=1, penalty='l2', random_state=1, class_weight='balanced')
-clf = LogisticRegressionCV(Cs = np.logspace(1e-4,1,5), penalty='l2', cv = 5, scoring='roc_auc', random_state=1, class_weight='balanced', n_jobs = -1)
-
-
+from sklearn.naive_bayes import  GaussianNB
+clf = GaussianNB()
 
 # ---
 
@@ -245,13 +136,16 @@ FPR = dict()
 TPR = dict()
 test_AUC = np.zeros((NUM_TRIALS*nfolds, nfeats))
 training_AUC = np.zeros((NUM_TRIALS*nfolds, nfeats)) # to have an idea about overfitting
+# other metrics to evaluate the classification performance
+test_ACC = np.zeros((NUM_TRIALS*nfolds, nfeats))
+test_F1 = np.zeros((NUM_TRIALS*nfolds, nfeats))
 
 # start the cross-validation procedure
 for itrial in np.arange(NUM_TRIALS):
 
     print "Trial {} (out of {})".format(itrial+1,NUM_TRIALS)
 
-    # split the dataset into 10 folds (9 for training and 1 for testing)
+    # split the dataset into nfols
     from sklearn.model_selection import StratifiedKFold
     skf = StratifiedKFold(n_splits = nfolds, shuffle = True, random_state = itrial)
 
@@ -271,11 +165,8 @@ for itrial in np.arange(NUM_TRIALS):
         importance = fi.wilcoxon(training_samples, training_labels)
         ranking = np.argsort(importance)
         ranking = ranking[::-1]
-        importance[ranking[nfeats_limit:]] = 0
         importance_scores[itrial * nfolds + icv, :] = importance
-        if len(np.where(importance!=0)[0]) != nfeats_limit:
-            print "WARNING"*5
-            check = True
+
 
         # preprocess the data
         if scaling:
@@ -283,19 +174,6 @@ for itrial in np.arange(NUM_TRIALS):
             scaler=preprocessing.StandardScaler().fit(training_samples)
             training_samples = scaler.transform(training_samples)
             test_samples = scaler.transform(test_samples)
-
-        # perform pca
-        if doPCA:
-            from sklearn.decomposition import PCA
-            ncomp = 100
-            pca = PCA(n_components=ncomp)
-            training_samples = training_samples[:, np.where(importance != 0)[0]]
-            test_samples = test_samples[:, np.where(importance != 0)[0]]
-            pca.fit(training_samples)
-            training_samples = pca.transform(training_samples)
-            test_samples = pca.transform(test_samples)
-            nfeats_limit = ncomp
-            ranking = np.arange(ncomp)
 
 
         for i in range(nfeats_limit): # this for loop implements a recursive feature selection procedure
@@ -305,22 +183,25 @@ for itrial in np.arange(NUM_TRIALS):
 
             # --- train the model using the training folds
             clf.fit(training_samples[:, ranking[0:i + 1]], training_labels)
+
             # --- test the model in the remaining fold and compute the ROC curve
-            from sklearn.metrics import roc_auc_score, roc_curve
-            y_scores = clf.decision_function( test_samples[:, ranking[0:i + 1]] )
-            # y_scores = clf.predict_proba( test_samples[:, ranking[0:i + 1]] )[:,1]
+            from sklearn.metrics import roc_auc_score, roc_curve, f1_score
+            # y_scores = clf.decision_function( test_samples[:, ranking[0:i + 1]] )
+            y_scores = clf.predict_proba(test_samples[:, ranking[0:i + 1]])[:,1]
+            y_predict = clf.predict(test_samples[:, ranking[0:i + 1]])
             y_true = test_labels
             fpr, tpr, thr = roc_curve(y_true, y_scores)
             FPR[itrial * nfolds + icv, i] = list(fpr)
             TPR[itrial * nfolds + icv, i] = list(tpr)
             test_AUC[itrial * nfolds + icv, i] = roc_auc_score(y_true, y_scores)
-            # --- test the model on the training samples too
-            y_scores = clf.decision_function(training_samples[:, ranking[0:i + 1]])
-            # y_scores = clf.predict_proba(training_samples[:, ranking[0:i + 1]])[:,1]
-            y_true = training_labels
-            fpr, tpr, thr = roc_curve(y_true, y_scores)
-            training_AUC[itrial * nfolds + icv, i] = roc_auc_score(y_true, y_scores)
+            test_ACC[itrial * nfolds + icv, i] = clf.score(test_samples[:, ranking[0:i + 1]], y_true)
+            test_F1[itrial * nfolds + icv, i] = f1_score(y_true, y_predict)
 
+            # --- test the model on the training samples too
+            # y_scores = clf.decision_function(training_samples[:, ranking[0:i + 1]])
+            y_scores = clf.predict_proba(training_samples[:, ranking[0:i + 1]])[:,1]
+            y_true = training_labels
+            training_AUC[itrial * nfolds + icv, i] = roc_auc_score(y_true, y_scores)
 
 
         icv += 1
@@ -353,6 +234,7 @@ training_auc_lower = mean_training_auc - std_training_auc
 max_indx = np.argmax(mean_test_auc) # 'max_indx + 1' is the optimal number of features to be used for diagnosis
 print "\nMax Auc %g (sd: %g) with %u features" % (mean_test_auc[max_indx], std_test_auc[max_indx], max_indx + 1)
 plt.figure()
+
 plt.plot(np.arange(1, nfeats + 1), mean_test_auc, color='b', lw=2, label="Mean Test AUC")
 plt.fill_between(np.arange(1,nfeats+1), test_auc_lower, test_auc_upper, color='grey', alpha=.2, label=r'$\pm$ 1 SD.')
 
@@ -362,6 +244,23 @@ plt.fill_between(np.arange(1,nfeats+1), training_auc_lower, training_auc_upper, 
 plt.scatter(max_indx+1, mean_test_auc[max_indx], color='k', marker="D", linewidths=1, alpha=1, zorder=5, label="Max AUC")
 plt.xlabel('Number of features')
 plt.ylabel('AUC')
+plt.legend(loc="lower right")
+plt.grid(True)
+plt.xlim([-2, nfeats+2])
+plt.ylim([0, 1.1])
+plt.show()
+
+# visualiza auc, acc and f1 only in the test dataset
+mean_test_acc = np.mean(test_ACC, 0)
+mean_test_f1 = np.mean(test_F1, 0)
+
+plt.figure()
+plt.plot(np.arange(1, nfeats + 1), mean_test_auc, color='b', lw=2, label="Mean Test AUC")
+plt.plot(np.arange(1, nfeats + 1), mean_test_acc, color='g', lw=2, label="Mean Test ACC")
+plt.plot(np.arange(1, nfeats + 1), mean_test_f1, color='k', lw=2, label="Mean Test F1")
+
+plt.xlabel('Number of features')
+plt.ylabel('Performance')
 plt.legend(loc="lower right")
 plt.grid(True)
 plt.xlim([-2, nfeats+2])

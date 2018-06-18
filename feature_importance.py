@@ -7,7 +7,6 @@ the relative importance of each feature.
 import numpy as np
 
 def ttest(X, Y):
-    # Feature importance by comparing the means between class labels of each individual feature
     # X: features, Y: labels
 
     from scipy import stats
@@ -25,7 +24,6 @@ def ttest(X, Y):
 
 
 def wilcoxon(X, Y):
-    # Feature importance by comparing the means between class labels of each individual feature
     # X: features, Y: labels
 
     from scipy import stats
@@ -43,14 +41,5 @@ def wilcoxon(X, Y):
 
 
 
-def acc(X, Y, clf):
-    # X: features, Y: labels
 
-    nfeats = X.shape[1]
-    importance = np.zeros((nfeats))
 
-    for i in np.arange(nfeats):
-        clf.fit(X[:,i][:,np.newaxis], Y)
-        importance[i] = clf.score(X[:,i][:,np.newaxis], Y)
-
-    return importance
