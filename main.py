@@ -49,9 +49,10 @@ nsamples, nfeats = X.shape
 nROIs = 102
 NETS = np.zeros((nsamples, nROIs, nROIs)) # variable to store subject-specific networks
 mask = np.triu(np.ones((nROIs, nROIs), dtype=bool), k=1)
-for isubj, W in enumerate(NETS):
+for isubj in np.arange(nsamples):
 
     links = X[isubj,:]
+    W = NETS[isubj].copy()
     W[mask] = links
     NETS[isubj,:] = W + W.T
 
@@ -66,29 +67,30 @@ for isubj, W in enumerate(NETS):
 import network_analysis as netanalysis
 reload(netanalysis)
 
-densities = [20]
-newX = np.zeros((nsamples, nROIs * len(densities) * 4))
-
-for isubj in np.arange(nsamples):
-
-    print "Subject {} (out of {})".format(isubj+1, nsamples)
-    thr_nets = netanalysis.thresholding(NETS[isubj], densities)
-    metrics = netanalysis.compute_metrics(thr_nets)
-    newX[isubj] = metrics
-
-X = newX
-
-# save data
-import pickle
-fout=open('data.txt', 'w')
-pickle.dump([X,Y], fout)
-fout.close()
-
-# # read from disk
+# densities = [40, 60, 80]
+# nofmetrics = 5 # degree, closeness, ...
+# newX = np.zeros((nsamples, nROIs * len(densities) * nofmetrics))
+#
+# for isubj in np.arange(nsamples):
+#
+#     print "Subject {} (out of {})".format(isubj+1, nsamples)
+#     thr_nets = netanalysis.thresholding(NETS[isubj], densities)
+#     metrics = netanalysis.compute_metrics(thr_nets)
+#     newX[isubj] = metrics
+#
+# X = newX
+#
+# # save data
 # import pickle
-# fin=open('data.txt', 'r')
-# X,Y=pickle.load(fin)
-# fin.close()
+# fout=open('data.txt', 'w')
+# pickle.dump([X,Y], fout)
+# fout.close()
+
+# read from disk
+import pickle
+fin=open('data.txt', 'r')
+X,Y=pickle.load(fin)
+fin.close()
 
 
 # *******************************************
@@ -104,7 +106,7 @@ nsamples, nfeats = X.shape
 # initialize variables
 nfolds = 10 # 10-fold cross-validation
 NUM_TRIALS = 1 # 10-repeated 10-fold cross-validation
-prct = 100 # percentage of features to be used
+prct = 50 # percentage of features to be used
 nfeats_limit = int(round(prct*1.0/100*nfeats))
 scaling = True # feature scaling?
 
@@ -118,14 +120,14 @@ importance_scores = np.zeros((NUM_TRIALS * nfolds, nfeats)) # store the importan
 #     {'C': [1, 10, 100], 'gamma': [0.001, 0.0001], 'kernel': ['rbf']},
 #  ]
 # clf=GridSearchCV(SVC(random_state = 1, class_weight = 'balanced'), param_grid = param_grid, cv = 5, n_jobs = -1)
-# # clf = SVC(C = 1, random_state = 1, class_weight = 'balanced')  # gaussian kernel with C=1 and sigma=1/num_features
+# clf = SVC(C = 1, random_state = 1, class_weight = 'balanced')  # gaussian kernel with C=1 and sigma=1/num_features
 
-from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
-clf = LogisticRegression(C=1e-2, penalty='l2', random_state=1, class_weight='balanced')
+# from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
+# clf = LogisticRegression(C=1, penalty='l1', random_state=1, class_weight='balanced')
 # clf = LogisticRegressionCV(Cs = np.logspace(1e-4,1,5), penalty='l2', cv = 5, scoring='roc_auc', random_state=1, class_weight='balanced', n_jobs = -1)
 
-# from sklearn.ensemble import RandomForestClassifier
-# clf = RandomForestClassifier(n_estimators=100, class_weight = 'balanced', random_state=1)
+from sklearn.naive_bayes import  GaussianNB
+clf = GaussianNB()
 
 # ---
 
@@ -145,7 +147,7 @@ for itrial in np.arange(NUM_TRIALS):
 
     # split the dataset into nfols
     from sklearn.model_selection import StratifiedKFold
-    skf = StratifiedKFold(n_splits = nfolds, shuffle = True, random_state = itrial+1)
+    skf = StratifiedKFold(n_splits = nfolds, shuffle = True, random_state = itrial)
 
     icv = 0
     for indxtrain, indxtest in skf.split(X, Y):
