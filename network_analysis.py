@@ -19,6 +19,7 @@ def thresholding(net, densities):
         density = densities[i]
         nlinks2keep = int(round(density*1.0/100*nlinks))
         newlinks = links.copy()
+        newlinks[ranking[:nlinks2keep]] = 1
         newlinks[ranking[nlinks2keep:]] = 0
         W[mask] = newlinks
         thr_nets[i] = W + W.T
