@@ -52,12 +52,14 @@ nsamples, nfeats = X.shape
 nROIs = 102
 NETS = np.zeros((nsamples, nROIs, nROIs)) # variable to store subject-specific networks
 mask = np.triu(np.ones((nROIs, nROIs), dtype=bool), k=1)
-for isubj, W in enumerate(NETS):
+for isubj in np.arange(nsamples):
 
+    W = NETS[isubj].copy()
     links = X[isubj,:]
     W[mask] = links
-    net = W + W.T
-    NETS[isubj,:] = netanalysis.thresholding(net, [40]).squeeze()
+    W = W + W.T
+    NETS[isubj] = netanalysis.thresholding(W, [40]).squeeze()
+    # NETS[isubj] = W
 
 # *******************************************
 # *******************************************
@@ -71,12 +73,11 @@ NUM_TRIALS = 1 # 10-repeated 10-fold cross-validation
 
 # --- select the kernel
 from grakel import GraphKernel
-# wl_kernel = GraphKernel(kernel = [{"name": "weisfeiler_lehman", "niter": 10}, {"name": "subtree_wl"}], normalize=True)
-wl_kernel = GraphKernel(kernel={"name": "shortest_path"}, normalize=True)
+wl_kernel = GraphKernel(kernel = [{"name": "weisfeiler_lehman", "niter": 10}, {"name": "subtree_wl"}], normalize=True)
 
 # --- now the classifier
 from sklearn.svm import SVC
-clf = SVC(C = 100, kernel='precomputed', random_state = 1, class_weight = 'balanced')
+clf = SVC(C = 1e-3, kernel='precomputed', random_state = 1, class_weight = 'balanced')
 
 # ---
 # variables to generate ROC curves
@@ -100,14 +101,15 @@ for itrial in np.arange(NUM_TRIALS):
     icv = 0
     for indxtrain, indxtest in skf.split(np.zeros(nsamples), Y):
 
-        edge = {key: '{}'.format(key) for key in np.arange(nROIs)}
-
+        # extract cd
+        import feature_importance as fi
+        ADJ = fi.maxcc(X[indxtrain,:], Y[indxtrain], th=1.5)
         import networkx as nx
         # training samples
         training_labels = Y[indxtrain]
         training_NETS = list()
         for indx in indxtrain:
-            W = nx.Graph(NETS[indx])
+            W = nx.Graph(NETS[indx]*ADJ)
             st = W.degree()
             edge = {key: '{}'.format(value) for key,value in st}
             training_NETS.append([NETS[indx], edge])
@@ -116,7 +118,7 @@ for itrial in np.arange(NUM_TRIALS):
         test_labels = Y[indxtest]
         test_NETS = list()
         for indx in indxtest:
-            W = nx.Graph(NETS[indx])
+            W = nx.Graph(NETS[indx]*ADJ)
             st = W.degree()
             edge = {key: '{}'.format(value) for key, value in st}
             test_NETS.append([NETS[indx], edge])
