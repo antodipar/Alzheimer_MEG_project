@@ -58,7 +58,7 @@ if doNet:
         links = X[isubj,:]
         W = NETS[isubj].copy()
         W[mask] = links
-        NETS[isubj,:] = W + W.T
+        NETS[isubj] = W + W.T
 
 
 
