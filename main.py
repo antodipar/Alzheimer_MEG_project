@@ -48,45 +48,15 @@ X = X[:,0:n]
 import network_analysis as netanalysis
 reload(netanalysis)
 
-doNet = False
+nsamples, _ = X.shape
+nROIs = 102
+nofmetrics = 4  # degree, closeness, ...
+nfeats = nROIs * nofmetrics
+NETS = np.zeros((nsamples, nROIs, nROIs)) # variable to store subject-specific networks
+for isubj in np.arange(nsamples):
 
-if doNet:
-
-    nsamples, nfeats = X.shape
-    nROIs = 102
-    NETS = np.zeros((nsamples, nROIs, nROIs)) # variable to store subject-specific networks
-    for isubj in np.arange(nsamples):
-
-        W = netanalysis.reconstruct_net(X[isubj,:], nROIs)
-        NETS[isubj] = W
-
-
-
-    # Feature extraction based on network measures
-    densities = [50]
-    nofmetrics = 5 # degree, closeness, ...
-    newX = np.zeros((nsamples, nROIs * len(densities) * nofmetrics))
-
-    for isubj in np.arange(nsamples):
-
-        print "Subject {} (out of {})".format(isubj+1, nsamples)
-        thr_nets = netanalysis.thresholding(NETS[isubj], densities)
-        metrics = netanalysis.compute_metrics(thr_nets)
-        newX[isubj] = metrics
-
-    X = newX
-
-    # save data
-    import pickle
-    fout=open('data.txt', 'w')
-    pickle.dump([X,Y], fout)
-    fout.close()
-
-    # # read from disk
-    # import pickle
-    # fin=open('data.txt', 'r')
-    # X,Y=pickle.load(fin)
-    # fin.close()
+    W = netanalysis.reconstruct_net(X[isubj,:], nROIs)
+    NETS[isubj] = W
 
 
 # *******************************************
@@ -96,13 +66,10 @@ if doNet:
 # *******************************************
 # *******************************************
 # *******************************************
-# Now we have a new set of features (if doNet is True)
-nsamples, nfeats = X.shape
-
 # initialize variables
-nfolds = 10 # 10-fold cross-validation
-NUM_TRIALS = 1 # 10-repeated 10-fold cross-validation
-prct = 50 # percentage of features to be used
+nfolds = 5 # 10-fold cross-validation
+NUM_TRIALS = 10 # 10-repeated 10-fold cross-validation
+prct = 100 # percentage of features to be used
 nfeats_limit = int(round(prct*1.0/100*nfeats))
 scaling = True # feature scaling?
 
@@ -110,20 +77,20 @@ importance_scores = np.zeros((NUM_TRIALS * nfolds, nfeats)) # store the importan
 
 # --- select the classifier
 
-# from sklearn.svm import SVC, LinearSVC
+from sklearn.svm import SVC, LinearSVC
 # from sklearn.model_selection import GridSearchCV
 # param_grid = [
 #     {'C': [1, 10, 100], 'gamma': [0.001, 0.0001], 'kernel': ['rbf']},
 #  ]
 # clf=GridSearchCV(SVC(random_state = 1, class_weight = 'balanced'), param_grid = param_grid, cv = 5, n_jobs = -1)
-# clf = SVC(C = 1, random_state = 1, class_weight = 'balanced')  # gaussian kernel with C=1 and sigma=1/num_features
+# clf = SVC(C = 1e-2, random_state = 1, class_weight = 'balanced')  # gaussian kernel with C=1 and sigma=1/num_features
 
-# from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
-# clf = LogisticRegression(C=1, penalty='l1', random_state=1, class_weight='balanced')
+from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
+clf = LogisticRegression(C=1e-2, penalty='l2', random_state=1, class_weight='balanced')
 # clf = LogisticRegressionCV(Cs = np.logspace(1e-4,1,5), penalty='l2', cv = 5, scoring='roc_auc', random_state=1, class_weight='balanced', n_jobs = -1)
 
-from sklearn.naive_bayes import  GaussianNB
-clf = GaussianNB()
+# from sklearn.naive_bayes import  GaussianNB
+# clf = GaussianNB()
 
 # ---
 
@@ -148,16 +115,36 @@ for itrial in np.arange(NUM_TRIALS):
     icv = 0
     for indxtrain, indxtest in skf.split(X, Y):
 
+        print "Iteration {} (out of {})".format(icv + 1, nfolds)
+
         # take training and test samples first
         training_samples = X[indxtrain, :]
         training_labels = Y[indxtrain]
         test_samples = X[indxtest, :]
         test_labels = Y[indxtest]
 
-        # compute feature ranking
+        # compute the connected component
         import feature_importance as fi
         reload(fi)
+        ADJ = fi.maxcc(training_samples, training_labels, 2.5)
 
+        # feature extraction based on network measures
+
+        training_samples = np.zeros((len(indxtrain), nfeats))
+        print "Extracting graph metrics from the training dataset..."
+        for isubj, indx in enumerate(indxtrain):
+
+            metrics = netanalysis.compute_metrics(NETS[indx]*ADJ[np.newaxis,:])
+            training_samples[isubj] = metrics
+
+        test_samples = np.zeros((len(indxtest), nfeats))
+        print "Extracting graph metrics from the test dataset..."
+        for isubj, indx in enumerate(indxtest):
+            metrics = netanalysis.compute_metrics(NETS[indx] * ADJ[np.newaxis, :])
+            test_samples[isubj] = metrics
+
+
+        # compute a ranking feature
         importance = fi.wilcoxon(training_samples, training_labels)
         ranking = np.argsort(importance)
         ranking = ranking[::-1]
@@ -175,30 +162,33 @@ for itrial in np.arange(NUM_TRIALS):
         for i in range(nfeats_limit): # this for loop implements a recursive feature selection procedure
 
             if i % 100 == 0:
-                print "Iteration {} (out of {}). Features {} (out of {} features)".format(icv+1, nfolds, i+1, nfeats_limit)
+                print "Features {} (out of {})".format(i+1, nfeats_limit)
 
             # --- train the model using the training folds
             clf.fit(training_samples[:, ranking[0:i + 1]], training_labels)
 
             # --- test the model in the remaining fold and compute the ROC curve
             from sklearn.metrics import roc_auc_score, roc_curve, f1_score
-            # y_scores = clf.decision_function( test_samples[:, ranking[0:i + 1]] )
-            y_scores = clf.predict_proba(test_samples[:, ranking[0:i + 1]])[:,1]
+            y_scores = clf.decision_function( test_samples[:, ranking[0:i + 1]] )
+            # y_scores = clf.predict_proba(test_samples[:, ranking[0:i + 1]])[:,1]
             y_predict = clf.predict(test_samples[:, ranking[0:i + 1]])
             y_true = test_labels
             fpr, tpr, thr = roc_curve(y_true, y_scores)
             FPR[itrial * nfolds + icv, i] = list(fpr)
             TPR[itrial * nfolds + icv, i] = list(tpr)
-            test_AUC[itrial * nfolds + icv, i] = roc_auc_score(y_true, y_scores)
+            test_auc = roc_auc_score(y_true, y_scores)
+            test_AUC[itrial * nfolds + icv, i] = test_auc
             test_ACC[itrial * nfolds + icv, i] = clf.score(test_samples[:, ranking[0:i + 1]], y_true)
             test_F1[itrial * nfolds + icv, i] = f1_score(y_true, y_predict)
 
             # --- test the model on the training samples too
-            # y_scores = clf.decision_function(training_samples[:, ranking[0:i + 1]])
-            y_scores = clf.predict_proba(training_samples[:, ranking[0:i + 1]])[:,1]
+            y_scores = clf.decision_function(training_samples[:, ranking[0:i + 1]])
+            # y_scores = clf.predict_proba(training_samples[:, ranking[0:i + 1]])[:,1]
             y_true = training_labels
-            training_AUC[itrial * nfolds + icv, i] = roc_auc_score(y_true, y_scores)
+            training_auc = roc_auc_score(y_true, y_scores)
+            training_AUC[itrial * nfolds + icv, i] = training_auc
 
+            print "Test AUC: {} - Training AUC: {}".format(test_auc, training_auc)
 
         icv += 1
 

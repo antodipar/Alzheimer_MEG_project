@@ -55,17 +55,17 @@ def compute_metrics(nets):
         betweenness = np.array(nx.betweenness_centrality(W, weight = 'weight').values())
 
         # --- eigenvector
-        eigenvector = np.array(nx.eigenvector_centrality(W, weight = 'weight').values())
+        # eigenvector = np.array(nx.eigenvector_centrality(W, weight = 'weight').values())
 
 
         # --- harmonic
         harmonic = np.array(nx.harmonic_centrality(W).values())
 
         # # --- clustering
-        # clustering = np.array(nx.clustering(W, weight = 'weight').values())
+        clustering = np.array(nx.clustering(W, weight = 'weight').values())
 
         # ---concatenate features
-        features = np.concatenate((features, strength, closeness, betweenness, eigenvector, harmonic))
+        features = np.concatenate((features, strength, closeness, betweenness, clustering))
 
     return features
 
