@@ -1,5 +1,5 @@
 
-# NOTE: I will be using Python 2.7.6
+# NOTE: I will be using Python 2.7.12
 
 # import basic modules
 import matplotlib.pyplot as plt
@@ -45,6 +45,9 @@ X = X[:,0:n]
 # *******************************************
 # *******************************************
 # *******************************************
+import network_analysis as netanalysis
+reload(netanalysis)
+
 doNet = False
 
 if doNet:
@@ -52,45 +55,38 @@ if doNet:
     nsamples, nfeats = X.shape
     nROIs = 102
     NETS = np.zeros((nsamples, nROIs, nROIs)) # variable to store subject-specific networks
-    mask = np.triu(np.ones((nROIs, nROIs), dtype=bool), k=1)
     for isubj in np.arange(nsamples):
 
-        links = X[isubj,:]
-        W = NETS[isubj].copy()
-        W[mask] = links
-        NETS[isubj] = W + W.T
+        W = netanalysis.reconstruct_net(X[isubj,:], nROIs)
+        NETS[isubj] = W
 
 
 
     # Feature extraction based on network measures
+    densities = [90]
+    nofmetrics = 5 # degree, closeness, ...
+    newX = np.zeros((nsamples, nROIs * len(densities) * nofmetrics))
 
-    import network_analysis as netanalysis
-    reload(netanalysis)
+    for isubj in np.arange(nsamples):
 
-    # densities = [40, 60, 80]
-    # nofmetrics = 5 # degree, closeness, ...
-    # newX = np.zeros((nsamples, nROIs * len(densities) * nofmetrics))
-    #
-    # for isubj in np.arange(nsamples):
-    #
-    #     print "Subject {} (out of {})".format(isubj+1, nsamples)
-    #     thr_nets = netanalysis.thresholding(NETS[isubj], densities)
-    #     metrics = netanalysis.compute_metrics(thr_nets)
-    #     newX[isubj] = metrics
-    #
-    # X = newX
-    #
-    # # save data
-    # import pickle
-    # fout=open('data.txt', 'w')
-    # pickle.dump([X,Y], fout)
-    # fout.close()
+        print "Subject {} (out of {})".format(isubj+1, nsamples)
+        thr_nets = netanalysis.thresholding(NETS[isubj], densities)
+        metrics = netanalysis.compute_metrics(thr_nets)
+        newX[isubj] = metrics
 
-    # read from disk
+    X = newX
+
+    # save data
     import pickle
-    fin=open('data.txt', 'r')
-    X,Y=pickle.load(fin)
-    fin.close()
+    fout=open('data.txt', 'w')
+    pickle.dump([X,Y], fout)
+    fout.close()
+
+    # # read from disk
+    # import pickle
+    # fin=open('data.txt', 'r')
+    # X,Y=pickle.load(fin)
+    # fin.close()
 
 
 # *******************************************
@@ -106,7 +102,7 @@ nsamples, nfeats = X.shape
 # initialize variables
 nfolds = 10 # 10-fold cross-validation
 NUM_TRIALS = 1 # 10-repeated 10-fold cross-validation
-prct = 20 # percentage of features to be used
+prct = 50 # percentage of features to be used
 nfeats_limit = int(round(prct*1.0/100*nfeats))
 scaling = True # feature scaling?
 
@@ -152,6 +148,9 @@ for itrial in np.arange(NUM_TRIALS):
     icv = 0
     for indxtrain, indxtest in skf.split(X, Y):
 
+        print "Iteration {} (out of {})".format(icv + 1, nfolds)
+
+
         # take training and test samples first
         training_samples = X[indxtrain, :]
         training_labels = Y[indxtrain]
@@ -179,7 +178,7 @@ for itrial in np.arange(NUM_TRIALS):
         for i in range(nfeats_limit): # this for loop implements a recursive feature selection procedure
 
             if i % 100 == 0:
-                print "Iteration {} (out of {}). Features {} (out of {} features)".format(icv+1, nfolds, i+1, nfeats_limit)
+                print "Features {} (out of {})".format(i+1, nfeats_limit)
 
             # --- train the model using the training folds
             clf.fit(training_samples[:, ranking[0:i + 1]], training_labels)
