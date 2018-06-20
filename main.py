@@ -15,7 +15,6 @@ data = Data.values
 X = data[:,2:]
 Y = data[:,1] > 1
 
-
 # *******************************************
 # *******************************************
 # *******************************************
@@ -48,7 +47,7 @@ X = X[:,0:n]
 import network_analysis as netanalysis
 reload(netanalysis)
 
-doNet = False
+doNet = True
 
 if doNet:
 
@@ -62,37 +61,37 @@ if doNet:
 
 
 
-    # Feature extraction based on network measures
-    densities = [90]
-    nofmetrics = 5 # degree, closeness, ...
-    newX = np.zeros((nsamples, nROIs * len(densities) * nofmetrics))
-
-    for isubj in np.arange(nsamples):
-
-        print "Subject {} (out of {})".format(isubj+1, nsamples)
-        thr_nets = netanalysis.thresholding(NETS[isubj], densities)
-        metrics = netanalysis.compute_metrics(thr_nets)
-        newX[isubj] = metrics
-
-    X = newX
-
-    # save data
-    import pickle
-    fout=open('data.txt', 'w')
-    pickle.dump([X,Y], fout)
-    fout.close()
-
-    # # read from disk
+    # # Feature extraction based on network measures
+    # densities = [90]
+    # nofmetrics = 5 # degree, closeness, ...
+    # newX = np.zeros((nsamples, nROIs * len(densities) * nofmetrics))
+    #
+    # for isubj in np.arange(nsamples):
+    #
+    #     print "Subject {} (out of {})".format(isubj+1, nsamples)
+    #     thr_nets = netanalysis.thresholding(NETS[isubj], densities)
+    #     metrics = netanalysis.compute_metrics(thr_nets)
+    #     newX[isubj] = metrics
+    #
+    # X = newX
+    #
+    # # save data
     # import pickle
-    # fin=open('data.txt', 'r')
-    # X,Y=pickle.load(fin)
-    # fin.close()
+    # fout=open('data.txt', 'w')
+    # pickle.dump([X,Y], fout)
+    # fout.close()
+
+    # read from disk
+    import pickle
+    fin=open('data.txt', 'r')
+    X,Y=pickle.load(fin)
+    fin.close()
 
 
 # *******************************************
 # *******************************************
 # *******************************************
-# Select model and estimate classification performance using cross-validation
+# Select model and estimate classification performance using bootstrap
 # *******************************************
 # *******************************************
 # *******************************************
@@ -100,13 +99,13 @@ if doNet:
 nsamples, nfeats = X.shape
 
 # initialize variables
-nfolds = 10 # 10-fold cross-validation
-NUM_TRIALS = 1 # 10-repeated 10-fold cross-validation
-prct = 50 # percentage of features to be used
+n_size = nsamples # 10-fold cross-validation
+n_iter = 40 # 10-repeated 10-fold cross-validation
+prct = 100 # percentage of features to be used
 nfeats_limit = int(round(prct*1.0/100*nfeats))
 scaling = True # feature scaling?
 
-importance_scores = np.zeros((NUM_TRIALS * nfolds, nfeats)) # store the importance of each feature across repetitions
+importance_scores = np.zeros((n_iter, nfeats)) # store the importance of each feature across repetitions
 
 # --- select the classifier
 
@@ -130,80 +129,80 @@ clf = GaussianNB()
 # variables to generate ROC curves
 FPR = dict()
 TPR = dict()
-test_AUC = np.zeros((NUM_TRIALS*nfolds, nfeats))
-training_AUC = np.zeros((NUM_TRIALS*nfolds, nfeats)) # to have an idea about overfitting
+test_AUC = np.zeros((n_iter, nfeats))
+training_AUC = np.zeros((n_iter, nfeats)) # to have an idea about overfitting
 # other metrics to evaluate the classification performance
-test_ACC = np.zeros((NUM_TRIALS*nfolds, nfeats))
-test_F1 = np.zeros((NUM_TRIALS*nfolds, nfeats))
+test_ACC = np.zeros((n_iter, nfeats))
+test_F1 = np.zeros((n_iter, nfeats))
 
 # start the cross-validation procedure
-for itrial in np.arange(NUM_TRIALS):
+data = np.hstack((X,Y[:,np.newaxis]))
+for itrial in np.arange(n_iter):
 
-    print "Trial {} (out of {})".format(itrial+1,NUM_TRIALS)
+    print "Iter {} (out of {})".format(itrial+1, n_iter)
 
-    # split the dataset into nfols
-    from sklearn.model_selection import StratifiedKFold
-    skf = StratifiedKFold(n_splits = nfolds, shuffle = True, random_state = itrial)
+    # prepare training and test datasets
+    from sklearn.utils import resample
 
-    icv = 0
-    for indxtrain, indxtest in skf.split(X, Y):
+    training_data = resample(data, replace=True, n_samples=n_size, random_state=itrial)
+    test_data = np.array([x for x in data if x.tolist() not in training_data.tolist()])
 
-        print "Iteration {} (out of {})".format(icv + 1, nfolds)
-
-
-        # take training and test samples first
-        training_samples = X[indxtrain, :]
-        training_labels = Y[indxtrain]
-        test_samples = X[indxtest, :]
-        test_labels = Y[indxtest]
-
-        # compute feature ranking
-        import feature_importance as fi
-        reload(fi)
-
-        importance = fi.wilcoxon(training_samples, training_labels)
-        ranking = np.argsort(importance)
-        ranking = ranking[::-1]
-        importance_scores[itrial * nfolds + icv, :] = importance
+    training_samples = training_data[:, :-1]
+    training_labels = training_data[:,-1]
+    test_samples = test_data[:, :-1]
+    test_labels = test_data[:, -1]
 
 
-        # preprocess the data
-        if scaling:
-            from sklearn import preprocessing
-            scaler=preprocessing.StandardScaler().fit(training_samples)
-            training_samples = scaler.transform(training_samples)
-            test_samples = scaler.transform(test_samples)
+    # compute feature ranking
+    import feature_importance as fi
+    reload(fi)
+
+    importance = fi.wilcoxon(training_samples, training_labels)
+    ranking = np.argsort(importance)
+    ranking = ranking[::-1]
+    importance_scores[itrial, :] = importance
 
 
-        for i in range(nfeats_limit): # this for loop implements a recursive feature selection procedure
-
-            if i % 100 == 0:
-                print "Features {} (out of {})".format(i+1, nfeats_limit)
-
-            # --- train the model using the training folds
-            clf.fit(training_samples[:, ranking[0:i + 1]], training_labels)
-
-            # --- test the model in the remaining fold and compute the ROC curve
-            from sklearn.metrics import roc_auc_score, roc_curve, f1_score
-            # y_scores = clf.decision_function( test_samples[:, ranking[0:i + 1]] )
-            y_scores = clf.predict_proba(test_samples[:, ranking[0:i + 1]])[:,1]
-            y_predict = clf.predict(test_samples[:, ranking[0:i + 1]])
-            y_true = test_labels
-            fpr, tpr, thr = roc_curve(y_true, y_scores)
-            FPR[itrial * nfolds + icv, i] = list(fpr)
-            TPR[itrial * nfolds + icv, i] = list(tpr)
-            test_AUC[itrial * nfolds + icv, i] = roc_auc_score(y_true, y_scores)
-            test_ACC[itrial * nfolds + icv, i] = clf.score(test_samples[:, ranking[0:i + 1]], y_true)
-            test_F1[itrial * nfolds + icv, i] = f1_score(y_true, y_predict)
-
-            # --- test the model on the training samples too
-            # y_scores = clf.decision_function(training_samples[:, ranking[0:i + 1]])
-            y_scores = clf.predict_proba(training_samples[:, ranking[0:i + 1]])[:,1]
-            y_true = training_labels
-            training_AUC[itrial * nfolds + icv, i] = roc_auc_score(y_true, y_scores)
+    # preprocess the data
+    if scaling:
+        from sklearn import preprocessing
+        scaler=preprocessing.StandardScaler().fit(training_samples)
+        training_samples = scaler.transform(training_samples)
+        test_samples = scaler.transform(test_samples)
 
 
-        icv += 1
+    for i in range(nfeats_limit): # this for loop implements a recursive feature selection procedure
+
+        if i % 100 == 0:
+            print "Features {} (out of {})".format(i+1, nfeats_limit)
+
+        # --- train the model using the training folds
+        clf.fit(training_samples[:, ranking[0:i + 1]], training_labels)
+
+        # --- test the model in the remaining fold and compute the ROC curve
+        from sklearn.metrics import roc_auc_score, roc_curve, f1_score
+        # y_scores = clf.decision_function( test_samples[:, ranking[0:i + 1]] )
+        y_scores = clf.predict_proba(test_samples[:, ranking[0:i + 1]])[:,1]
+        y_predict = clf.predict(test_samples[:, ranking[0:i + 1]])
+        y_true = test_labels
+        fpr, tpr, thr = roc_curve(y_true, y_scores)
+        FPR[itrial, i] = list(fpr)
+        TPR[itrial, i] = list(tpr)
+        test_auc = roc_auc_score(y_true, y_scores)
+        test_AUC[itrial, i] = test_auc
+        test_ACC[itrial, i] = clf.score(test_samples[:, ranking[0:i + 1]], y_true)
+        test_F1[itrial, i] = f1_score(y_true, y_predict)
+
+        # --- test the model on the training samples too
+        # y_scores = clf.decision_function(training_samples[:, ranking[0:i + 1]])
+        y_scores = clf.predict_proba(training_samples[:, ranking[0:i + 1]])[:,1]
+        y_true = training_labels
+        training_auc = roc_auc_score(y_true, y_scores)
+        training_AUC[itrial, i] = training_auc
+
+        print "Test AUC: {} - Training AUC: {}".format(test_auc, training_auc)
+
+
 
 
 # *******************************************
