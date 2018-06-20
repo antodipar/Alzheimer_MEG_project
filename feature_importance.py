@@ -87,5 +87,13 @@ def maxcc(X, Y, th = 1.5):
     return newADJ
 
 
+def statiblity(X,Y):
+
+    from sklearn.linear_model import RandomizedLogisticRegression
+
+    clf = RandomizedLogisticRegression(random_state=1)
+    clf.fit(X,Y)
+
+    return clf.scores_
 
 
