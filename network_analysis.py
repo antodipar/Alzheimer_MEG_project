@@ -2,6 +2,13 @@
 
 import numpy as np
 
+def reconstruct_net(links, nROIs):
+
+    W = np.zeros((nROIs, nROIs))
+    mask = np.triu(np.ones((nROIs, nROIs), dtype=bool), k=1)
+    W[mask] = links
+    return W + W.T
+
 
 def thresholding(net, densities):
 
@@ -17,13 +24,12 @@ def thresholding(net, densities):
 
     for iden, density in enumerate(densities):
 
-        W = thr_nets[iden].copy()
         newlinks = links.copy()
         nlinks2keep = int(round(density*1.0/100*nlinks))
         # newlinks[ranking[:nlinks2keep]] = 1
         newlinks[ranking[nlinks2keep:]] = 0
-        W[mask] = newlinks
-        thr_nets[iden] = W + W.T
+        W = reconstruct_net(newlinks, nROIs)
+        thr_nets[iden] = W
 
 
     return thr_nets
@@ -33,7 +39,6 @@ def compute_metrics(nets):
     import networkx as nx
 
     features = np.array([])
-    nROIs = nets.shape[1]
 
     for W in nets:
 
@@ -63,4 +68,6 @@ def compute_metrics(nets):
         features = np.concatenate((features, strength, closeness, betweenness, eigenvector, harmonic))
 
     return features
+
+
 

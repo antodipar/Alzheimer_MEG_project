@@ -41,9 +41,11 @@ def wilcoxon(X, Y):
 
 
 
-def maxcc(X, Y, th = 3):
+def maxcc(X, Y, th = 1.5):
     # X: features, Y: labels
 
+    import network_analysis as netanalysis
+    reload(netanalysis)
     import networkx as nx
     from scipy import stats
     nfeats = X.shape[1]
@@ -59,10 +61,8 @@ def maxcc(X, Y, th = 3):
 
     # reconstruct the network
     nROIs = 102
-    ADJ = np.zeros((nROIs, nROIs))
-    mask = np.triu(np.ones((nROIs, nROIs), dtype=bool), k=1)
-    ADJ[mask] = t_test >= th
-    ADJ = ADJ + ADJ.T
+    ADJ = netanalysis.reconstruct_net(t_test, nROIs)
+    ADJ = ADJ >= th
 
     # Find network components
     G = nx.from_numpy_matrix(ADJ)
@@ -76,7 +76,7 @@ def maxcc(X, Y, th = 3):
         nr_edges_per_component[idx] = componentG.number_of_edges()
 
     G = comp_list[np.argmax(nr_edges_per_component)]
-
+    print "Max size: {}".format(nr_edges_per_component[np.argmax(nr_edges_per_component)])
     newADJ = np.zeros((nROIs, nROIs), dtype=bool)
     for ed in G.edges():
         newADJ[ed[0], ed[1]] = True
