@@ -47,25 +47,25 @@ def compute_metrics(nets):
         # --- strength
         st = W.degree(weight = 'weight')
         strength = np.array([info[1] for info in st])
-
+        strength=(strength-strength.mean())/strength.std(ddof=1)
         # --- closeness
         closeness = np.array(nx.closeness_centrality(W, distance = 'weight').values())
-
+        closeness = (closeness-closeness.mean())/closeness.std(ddof=1)
         # --- betweenness centrality
-        betweenness = np.array(nx.betweenness_centrality(W, weight = 'weight').values())
-
+        # betweenness = np.array(nx.betweenness_centrality(W, weight = 'weight').values())
+        # betweenness = (betweenness-betweenness.mean())/betweenness.std(ddof=1)
         # --- eigenvector
-        # eigenvector = np.array(nx.eigenvector_centrality(W, weight = 'weight').values())
-
+        eigenvector = np.array(nx.eigenvector_centrality(W, weight = 'weight').values())
+        eigenvector = (eigenvector-eigenvector.mean())/eigenvector.std(ddof=1)
 
         # --- harmonic
-        harmonic = np.array(nx.harmonic_centrality(W).values())
+        # harmonic = np.array(nx.harmonic_centrality(W).values())
 
         # # --- clustering
-        clustering = np.array(nx.clustering(W, weight = 'weight').values())
-
+        # clustering = np.array(nx.clustering(W, weight = 'weight').values())
+        # clustering=(clustering-clustering.mean())/clustering.std(ddof=1)
         # ---concatenate features
-        features = np.concatenate((features, strength, closeness, betweenness, clustering))
+        features = np.concatenate((features, strength, closeness, eigenvector))
 
     return features
 

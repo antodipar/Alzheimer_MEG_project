@@ -50,7 +50,7 @@ reload(netanalysis)
 
 nsamples, _ = X.shape
 nROIs = 102
-nofmetrics = 4  # degree, closeness, ...
+nofmetrics = 3  # degree, closeness, ...
 nfeats = nROIs * nofmetrics
 NETS = np.zeros((nsamples, nROIs, nROIs)) # variable to store subject-specific networks
 for isubj in np.arange(nsamples):
@@ -67,11 +67,11 @@ for isubj in np.arange(nsamples):
 # *******************************************
 # *******************************************
 # initialize variables
-nfolds = 5 # 10-fold cross-validation
-NUM_TRIALS = 10 # 10-repeated 10-fold cross-validation
-prct = 100 # percentage of features to be used
+nfolds = 10 # 10-fold cross-validation
+NUM_TRIALS = 1 # 10-repeated 10-fold cross-validation
+prct = 50 # percentage of features to be used
 nfeats_limit = int(round(prct*1.0/100*nfeats))
-scaling = True # feature scaling?
+scaling = False # feature scaling?
 
 importance_scores = np.zeros((NUM_TRIALS * nfolds, nfeats)) # store the importance of each feature across repetitions
 
@@ -83,10 +83,10 @@ from sklearn.svm import SVC, LinearSVC
 #     {'C': [1, 10, 100], 'gamma': [0.001, 0.0001], 'kernel': ['rbf']},
 #  ]
 # clf=GridSearchCV(SVC(random_state = 1, class_weight = 'balanced'), param_grid = param_grid, cv = 5, n_jobs = -1)
-# clf = SVC(C = 1e-2, random_state = 1, class_weight = 'balanced')  # gaussian kernel with C=1 and sigma=1/num_features
+clf = SVC(C = 1, random_state = 1, class_weight = 'balanced')  # gaussian kernel with C=1 and sigma=1/num_features
 
-from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
-clf = LogisticRegression(C=1e-2, penalty='l2', random_state=1, class_weight='balanced')
+# from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
+# clf = LogisticRegression(C=1e-2, penalty='l2', random_state=1, class_weight='balanced')
 # clf = LogisticRegressionCV(Cs = np.logspace(1e-4,1,5), penalty='l2', cv = 5, scoring='roc_auc', random_state=1, class_weight='balanced', n_jobs = -1)
 
 # from sklearn.naive_bayes import  GaussianNB
@@ -126,7 +126,7 @@ for itrial in np.arange(NUM_TRIALS):
         # compute the connected component
         import feature_importance as fi
         reload(fi)
-        ADJ = fi.maxcc(training_samples, training_labels, 2.5)
+        ADJ = fi.maxcc(training_samples, training_labels, 1.5)
 
         # feature extraction based on network measures
 
