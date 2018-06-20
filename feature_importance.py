@@ -40,6 +40,22 @@ def wilcoxon(X, Y):
     return importance
 
 
+def rf(X, Y, param=100):
+    from sklearn.ensemble import RandomForestClassifier
+
+    clf = RandomForestClassifier(n_estimators=param, random_state=1)
+    clf.fit(X, Y)
+    return clf.feature_importances_
+
+
+def lr(X, Y, param=1e-2):
+    from sklearn.linear_model import LogisticRegression
+
+    clf = LogisticRegression(C=param, penalty='l2', random_state=1, class_weight='balanced')
+    clf.fit(X, Y)
+    return clf.coef_.squeeze()
+
+
 
 def maxcc(X, Y, th = 1.5):
     # X: features, Y: labels
@@ -87,5 +103,13 @@ def maxcc(X, Y, th = 1.5):
     return newADJ
 
 
+def statiblity(X,Y):
+
+    from sklearn.linear_model import RandomizedLogisticRegression
+
+    clf = RandomizedLogisticRegression(random_state=1)
+    clf.fit(X,Y)
+
+    return clf.scores_
 
 
