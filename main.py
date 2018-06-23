@@ -136,145 +136,160 @@ clf = SVC(C = 1e-2, random_state = 1, kernel= 'linear')  # gaussian kernel with 
 # clf = AdaBoostClassifier(learning_rate=0.1, n_estimators=30, random_state= 1)
 # ---
 
-# variables to generate ROC curves
-FPR = dict()
-TPR = dict()
-test_AUC = np.zeros((NUM_TRIALS*nfolds, nfeats))
-training_AUC = np.zeros((NUM_TRIALS*nfolds, nfeats)) # to have an idea about overfitting
-# other metrics to evaluate the classification performance
-test_ACC = np.zeros((NUM_TRIALS*nfolds, nfeats))
-test_F1 = np.zeros((NUM_TRIALS*nfolds, nfeats))
+outlier_perf = np.zeros(nsamples)
 
-# start the cross-validation procedure
-for itrial in np.arange(NUM_TRIALS):
+X_back = X.copy()
+Y_back = Y.copy()
+for iout in np.arange(nsamples):
 
-    print "Trial {} (out of {})".format(itrial+1,NUM_TRIALS)
-
-    # split the dataset into nfols
-    from sklearn.model_selection import StratifiedKFold
-    skf = StratifiedKFold(n_splits = nfolds, shuffle = True, random_state = itrial)
-
-    icv = 0
-    for indxtrain, indxtest in skf.split(X, Y):
-
-        print "Iteration {} (out of {})".format(icv + 1, nfolds)
+    cond = Y_back[iout]
+    indx2keep = np.setxor1d(iout, np.arange(nsamples))
+    X = X_back[indx2keep, :].copy()
+    Y = Y_back[indx2keep].copy()
 
 
-        # take training and test samples first
-        training_samples = X[indxtrain, :]
-        training_labels = Y[indxtrain]
-        test_samples = X[indxtest, :]
-        test_labels = Y[indxtest]
+    # variables to generate ROC curves
+    FPR = dict()
+    TPR = dict()
+    test_AUC = np.zeros((NUM_TRIALS*nfolds, nfeats))
+    training_AUC = np.zeros((NUM_TRIALS*nfolds, nfeats)) # to have an idea about overfitting
+    # other metrics to evaluate the classification performance
+    test_ACC = np.zeros((NUM_TRIALS*nfolds, nfeats))
+    test_F1 = np.zeros((NUM_TRIALS*nfolds, nfeats))
 
-        # compute feature ranking
-        import feature_importance as fi
-        reload(fi)
+    # start the cross-validation procedure
+    for itrial in np.arange(NUM_TRIALS):
 
-        importance = fi.wilcoxon(training_samples, training_labels)
-        ranking = np.argsort(importance)
-        ranking = ranking[::-1]
-        importance_scores[itrial * nfolds + icv, :] = importance
+        print "Trial {} (out of {})".format(itrial+1,NUM_TRIALS)
 
+        # split the dataset into nfols
+        from sklearn.model_selection import StratifiedKFold
+        skf = StratifiedKFold(n_splits = nfolds, shuffle = True, random_state = itrial)
 
-        # preprocess the data
-        if scaling:
-            from sklearn import preprocessing
-            scaler=preprocessing.StandardScaler().fit(training_samples)
-            training_samples = scaler.transform(training_samples)
-            test_samples = scaler.transform(test_samples)
+        icv = 0
+        for indxtrain, indxtest in skf.split(X, Y):
 
-
-        for i in range(nfeats_limit): # this for loop implements a recursive feature selection procedure
-
-            if i % 100 == 0:
-                print "Features {} (out of {})".format(i+1, nfeats_limit)
+            print "Iteration {} (out of {})".format(icv + 1, nfolds)
 
 
-            # --- train the model using the training folds
-            clf.fit(training_samples[:, ranking[0:i + 1]], training_labels)
+            # take training and test samples first
+            training_samples = X[indxtrain, :]
+            training_labels = Y[indxtrain]
+            test_samples = X[indxtest, :]
+            test_labels = Y[indxtest]
 
-            # --- test the model in the remaining fold and compute the ROC curve
-            from sklearn.metrics import roc_auc_score, roc_curve, f1_score
-            y_scores = clf.decision_function( test_samples[:, ranking[0:i + 1]] )
-            # y_scores = clf.predict_proba(test_samples[:, ranking[0:i + 1]])[:,1]
-            y_predict = clf.predict(test_samples[:, ranking[0:i + 1]])
-            y_true = test_labels
-            fpr, tpr, thr = roc_curve(y_true, y_scores)
-            FPR[itrial * nfolds + icv, i] = list(fpr)
-            TPR[itrial * nfolds + icv, i] = list(tpr)
-            test_auc = roc_auc_score(y_true, y_scores)
-            test_AUC[itrial * nfolds + icv, i] = test_auc
-            test_ACC[itrial * nfolds + icv, i] = clf.score(test_samples[:, ranking[0:i + 1]], y_true)
-            test_F1[itrial * nfolds + icv, i] = f1_score(y_true, y_predict)
+            # compute feature ranking
+            import feature_importance as fi
+            reload(fi)
 
-            # --- test the model on the training samples too
-            y_scores = clf.decision_function(training_samples[:, ranking[0:i + 1]])
-            # y_scores = clf.predict_proba(training_samples[:, ranking[0:i + 1]])[:,1]
-            y_true = training_labels
-            training_auc = roc_auc_score(y_true, y_scores)
-            training_AUC[itrial * nfolds + icv, i] = training_auc
-
-            print "Test AUC: {} - Training AUC: {}".format(test_auc, training_auc)
-
-        icv += 1
+            importance = fi.wilcoxon(training_samples, training_labels)
+            ranking = np.argsort(importance)
+            ranking = ranking[::-1]
+            importance_scores[itrial * nfolds + icv, :] = importance
 
 
-# *******************************************
-# *******************************************
-# *******************************************
-# Visualize the outcome
-# *******************************************
-# *******************************************
-# *******************************************
+            # preprocess the data
+            if scaling:
+                from sklearn import preprocessing
+                scaler=preprocessing.StandardScaler().fit(training_samples)
+                training_samples = scaler.transform(training_samples)
+                test_samples = scaler.transform(test_samples)
 
-# # compute the average importance scores
-# mean_fi = np.mean(importance_scores,0)
-# final_ranking = np.argsort(mean_fi)
-# final_ranking = final_ranking[::-1]
 
-# select features and plot test_AUC and training_AUC
-mean_test_auc = np.mean(test_AUC, 0)
-std_test_auc = np.std(test_AUC, 0)
-test_auc_upper = mean_test_auc + std_test_auc
-test_auc_lower = mean_test_auc - std_test_auc
+            for i in range(nfeats_limit): # this for loop implements a recursive feature selection procedure
 
-mean_training_auc = np.mean(training_AUC, 0)
-std_training_auc = np.std(training_AUC, 0)
-training_auc_upper = mean_training_auc + std_training_auc
-training_auc_lower = mean_training_auc - std_training_auc
+                if i % 100 == 0:
+                    print "Features {} (out of {})".format(i+1, nfeats_limit)
 
-max_indx = np.argmax(mean_test_auc) # 'max_indx + 1' is the optimal number of features to be used for diagnosis
-print "\nMax Auc %g (sd: %g) with %u features" % (mean_test_auc[max_indx], std_test_auc[max_indx], max_indx + 1)
-plt.figure()
 
-plt.plot(np.arange(1, nfeats + 1), mean_test_auc, color='b', lw=2, label="Mean Test AUC")
-plt.fill_between(np.arange(1,nfeats+1), test_auc_lower, test_auc_upper, color='grey', alpha=.2, label=r'$\pm$ 1 SD.')
+                # --- train the model using the training folds
+                clf.fit(training_samples[:, ranking[0:i + 1]], training_labels)
 
-plt.plot(np.arange(1, nfeats + 1), mean_training_auc, color='g', lw=2, label="Mean Training AUC")
-plt.fill_between(np.arange(1,nfeats+1), training_auc_lower, training_auc_upper, color='red', alpha=.2, label=r'$\pm$ 1 SD.')
+                # --- test the model in the remaining fold and compute the ROC curve
+                from sklearn.metrics import roc_auc_score, roc_curve, f1_score
+                y_scores = clf.decision_function( test_samples[:, ranking[0:i + 1]] )
+                # y_scores = clf.predict_proba(test_samples[:, ranking[0:i + 1]])[:,1]
+                y_predict = clf.predict(test_samples[:, ranking[0:i + 1]])
+                y_true = test_labels
+                fpr, tpr, thr = roc_curve(y_true, y_scores)
+                FPR[itrial * nfolds + icv, i] = list(fpr)
+                TPR[itrial * nfolds + icv, i] = list(tpr)
+                test_auc = roc_auc_score(y_true, y_scores)
+                test_AUC[itrial * nfolds + icv, i] = test_auc
+                test_ACC[itrial * nfolds + icv, i] = clf.score(test_samples[:, ranking[0:i + 1]], y_true)
+                test_F1[itrial * nfolds + icv, i] = f1_score(y_true, y_predict)
 
-plt.scatter(max_indx+1, mean_test_auc[max_indx], color='k', marker="D", linewidths=1, alpha=1, zorder=5, label="Max AUC")
-plt.xlabel('Number of features')
-plt.ylabel('AUC')
-plt.legend(loc="lower right")
-plt.grid(True)
-plt.xlim([-2, nfeats+2])
-plt.ylim([0, 1.1])
-plt.show()
+                # --- test the model on the training samples too
+                y_scores = clf.decision_function(training_samples[:, ranking[0:i + 1]])
+                # y_scores = clf.predict_proba(training_samples[:, ranking[0:i + 1]])[:,1]
+                y_true = training_labels
+                training_auc = roc_auc_score(y_true, y_scores)
+                training_AUC[itrial * nfolds + icv, i] = training_auc
 
-# visualiza auc, acc and f1 only in the test dataset
-mean_test_acc = np.mean(test_ACC, 0)
-mean_test_f1 = np.mean(test_F1, 0)
+                # print "Test AUC: {} - Training AUC: {}".format(test_auc, training_auc)
 
-plt.figure()
-plt.plot(np.arange(1, nfeats + 1), mean_test_auc, color='b', lw=2, label="Mean Test AUC")
-plt.plot(np.arange(1, nfeats + 1), mean_test_acc, color='g', lw=2, label="Mean Test ACC")
-plt.plot(np.arange(1, nfeats + 1), mean_test_f1, color='k', lw=2, label="Mean Test F1")
+            icv += 1
 
-plt.xlabel('Number of features')
-plt.ylabel('Performance')
-plt.legend(loc="lower right")
-plt.grid(True)
-plt.xlim([-2, nfeats+2])
-plt.ylim([0, 1.1])
-plt.show()
+
+    # *******************************************
+    # *******************************************
+    # *******************************************
+    # Visualize the outcome
+    # *******************************************
+    # *******************************************
+    # *******************************************
+
+    # # compute the average importance scores
+    # mean_fi = np.mean(importance_scores,0)
+    # final_ranking = np.argsort(mean_fi)
+    # final_ranking = final_ranking[::-1]
+
+    # select features and plot test_AUC and training_AUC
+    mean_test_auc = np.mean(test_AUC, 0)
+    std_test_auc = np.std(test_AUC, 0)
+    test_auc_upper = mean_test_auc + std_test_auc
+    test_auc_lower = mean_test_auc - std_test_auc
+
+    mean_training_auc = np.mean(training_AUC, 0)
+    std_training_auc = np.std(training_AUC, 0)
+    training_auc_upper = mean_training_auc + std_training_auc
+    training_auc_lower = mean_training_auc - std_training_auc
+
+    max_indx = np.argmax(mean_test_auc) # 'max_indx + 1' is the optimal number of features to be used for diagnosis
+    # print "\nMax Auc %g (sd: %g) with %u features" % (mean_test_auc[max_indx], std_test_auc[max_indx], max_indx + 1)
+    # plt.figure()
+    #
+    # plt.plot(np.arange(1, nfeats + 1), mean_test_auc, color='b', lw=2, label="Mean Test AUC")
+    # plt.fill_between(np.arange(1,nfeats+1), test_auc_lower, test_auc_upper, color='grey', alpha=.2, label=r'$\pm$ 1 SD.')
+    #
+    # plt.plot(np.arange(1, nfeats + 1), mean_training_auc, color='g', lw=2, label="Mean Training AUC")
+    # plt.fill_between(np.arange(1,nfeats+1), training_auc_lower, training_auc_upper, color='red', alpha=.2, label=r'$\pm$ 1 SD.')
+    #
+    # plt.scatter(max_indx+1, mean_test_auc[max_indx], color='k', marker="D", linewidths=1, alpha=1, zorder=5, label="Max AUC")
+    # plt.xlabel('Number of features')
+    # plt.ylabel('AUC')
+    # plt.legend(loc="lower right")
+    # plt.grid(True)
+    # plt.xlim([-2, nfeats+2])
+    # plt.ylim([0, 1.1])
+    # plt.show()
+    #
+    # # visualiza auc, acc and f1 only in the test dataset
+    # mean_test_acc = np.mean(test_ACC, 0)
+    # mean_test_f1 = np.mean(test_F1, 0)
+    #
+    # plt.figure()
+    # plt.plot(np.arange(1, nfeats + 1), mean_test_auc, color='b', lw=2, label="Mean Test AUC")
+    # plt.plot(np.arange(1, nfeats + 1), mean_test_acc, color='g', lw=2, label="Mean Test ACC")
+    # plt.plot(np.arange(1, nfeats + 1), mean_test_f1, color='k', lw=2, label="Mean Test F1")
+    #
+    # plt.xlabel('Number of features')
+    # plt.ylabel('Performance')
+    # plt.legend(loc="lower right")
+    # plt.grid(True)
+    # plt.xlim([-2, nfeats+2])
+    # plt.ylim([0, 1.1])
+    # plt.show()
+
+    outlier_perf[iout]=mean_test_auc[max_indx]
+    print "Out subject: {} - Condition: {} - AUC: {}".format(iout, cond, mean_test_auc[max_indx])
