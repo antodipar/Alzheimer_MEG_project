@@ -15,7 +15,6 @@ data = Data.values
 X = data[:,2:]
 Y = data[:,1] > 1
 
-
 # *******************************************
 # *******************************************
 # *******************************************
@@ -102,38 +101,20 @@ nsamples, nfeats = X.shape
 # initialize variables
 nfolds = 10 # 10-fold cross-validation
 NUM_TRIALS = 1 # 10-repeated 10-fold cross-validation
-prct = 50 # percentage of features to be used
+prct = 20 # percentage of features to be used
 nfeats_limit = int(round(prct*1.0/100*nfeats))
 scaling = False # feature scaling?
 
 importance_scores = np.zeros((NUM_TRIALS * nfolds, nfeats)) # store the importance of each feature across repetitions
 
 # --- select the classifier
-
-from sklearn.svm import SVC, LinearSVC
-from sklearn.model_selection import GridSearchCV
-# param_grid = [
-#     {'C': [1, 10, 100], 'gamma': [0.001, 0.0001], 'kernel': ['rbf']},
-#  ]
-# param_grid = [
-#     {'C': [1e-2, 1e-1, 1, 10, 100], 'kernel': ['linear']},
-#  ]
-# clf=GridSearchCV(SVC(random_state = 1, class_weight = 'balanced'), param_grid = param_grid, cv = 10, n_jobs = -1)
-clf = SVC(C = 1e-2, random_state = 1, kernel= 'linear')  # gaussian kernel with C=1 and sigma=1/num_features
-
-# from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
-# clf = LogisticRegression(C=1e-3, penalty='l2', random_state=1, class_weight='balanced')
-# clf = LogisticRegressionCV(Cs = np.logspace(1e-4,1,5), penalty='l2', cv = 5, scoring='roc_auc', random_state=1, class_weight='balanced', n_jobs = -1)
-
-# from sklearn.naive_bayes import  GaussianNB
-# clf = GaussianNB()
-
-# from sklearn.neural_network import MLPClassifier
-# clf = MLPClassifier(hidden_layer_sizes=8, activation='logistic', alpha= 1e-2, max_iter=1000, random_state=1)
+from MKLpy.algorithms import EasyMKL,RMGD,RMKL,AverageMKL
+from sklearn.metrics.pairwise import linear_kernel
+from sklearn.svm import SVC
+cflsvm = SVC(C = 1e-2, class_weight='balanced', random_state = 1, kernel= 'precomputed')
+clf = EasyMKL(estimator=cflsvm)
 
 
-# from sklearn.ensemble import AdaBoostClassifier
-# clf = AdaBoostClassifier(learning_rate=0.01, n_estimators=30, random_state= 1)
 # ---
 
 # variables to generate ROC curves
@@ -190,25 +171,30 @@ for itrial in np.arange(NUM_TRIALS):
                 print "Features {} (out of {})".format(i+1, nfeats_limit)
 
 
+            KL = [linear_kernel(X[:, ranking[0:i + 1]])]
+            Ktrain = [K[indxtrain][:, indxtrain] for K in KL]
+            Ktest = [K[indxtest][:, indxtrain] for K in KL]
+
             # --- train the model using the training folds
-            clf.fit(training_samples[:, ranking[0:i + 1]], training_labels)
+            clf.fit(Ktrain, training_labels)
+
 
             # --- test the model in the remaining fold and compute the ROC curve
             from sklearn.metrics import roc_auc_score, roc_curve, f1_score
-            y_scores = clf.decision_function( test_samples[:, ranking[0:i + 1]] )
+            y_scores = clf.decision_function( Ktest)
             # y_scores = clf.predict_proba(test_samples[:, ranking[0:i + 1]])[:,1]
-            y_predict = clf.predict(test_samples[:, ranking[0:i + 1]])
+            y_predict = clf.predict(Ktest)
             y_true = test_labels
             fpr, tpr, thr = roc_curve(y_true, y_scores)
             FPR[itrial * nfolds + icv, i] = list(fpr)
             TPR[itrial * nfolds + icv, i] = list(tpr)
             test_auc = roc_auc_score(y_true, y_scores)
             test_AUC[itrial * nfolds + icv, i] = test_auc
-            test_ACC[itrial * nfolds + icv, i] = clf.score(test_samples[:, ranking[0:i + 1]], y_true)
+            test_ACC[itrial * nfolds + icv, i] = clf.score(Ktest, y_true)
             test_F1[itrial * nfolds + icv, i] = f1_score(y_true, y_predict)
 
             # --- test the model on the training samples too
-            y_scores = clf.decision_function(training_samples[:, ranking[0:i + 1]])
+            y_scores = clf.decision_function(Ktrain)
             # y_scores = clf.predict_proba(training_samples[:, ranking[0:i + 1]])[:,1]
             y_true = training_labels
             training_auc = roc_auc_score(y_true, y_scores)
