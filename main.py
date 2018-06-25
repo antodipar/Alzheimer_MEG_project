@@ -47,45 +47,45 @@ X = X[:,0:n]
 import network_analysis as netanalysis
 reload(netanalysis)
 
-doNet = True
+nsamples, nfeats = X.shape
+nROIs = 102
+NETS = np.zeros((nsamples, nROIs, nROIs)) # variable to store subject-specific networks
 
-if doNet:
+for isubj in np.arange(nsamples):
 
-    nsamples, nfeats = X.shape
-    nROIs = 102
-    NETS = np.zeros((nsamples, nROIs, nROIs)) # variable to store subject-specific networks
-    for isubj in np.arange(nsamples):
-
-        W = netanalysis.reconstruct_net(X[isubj,:], nROIs)
-        NETS[isubj] = W
+    W = netanalysis.reconstruct_net(X[isubj,:], nROIs)
+    NETS[isubj] = W
 
 
 
-    # # Feature extraction based on network measures
-    # densities = [70]
-    # nofmetrics = 6 # degree, closeness, ...
-    # newX = np.zeros((nsamples, nROIs * len(densities) * nofmetrics))
-    #
-    # for isubj in np.arange(nsamples):
-    #
-    #     print "Subject {} (out of {})".format(isubj+1, nsamples)
-    #     thr_nets = netanalysis.thresholding(NETS[isubj], densities)
-    #     metrics = netanalysis.compute_metrics(thr_nets)
-    #     newX[isubj] = metrics
-    #
-    # X = newX
-    #
-    # # save data
-    # import pickle
-    # fout=open('data.txt', 'w')
-    # pickle.dump([X,Y], fout)
-    # fout.close()
+# Feature extraction based on network measures
+densities = [50, 60, 70, 80, 90]
+nofmetrics = 5 # degree, closeness, ...
+newX = np.zeros((nsamples, nROIs*nofmetrics, len(densities)))
 
-    # read from disk
-    import pickle
-    fin=open('data.txt', 'r')
-    X,Y=pickle.load(fin)
-    fin.close()
+# for isubj in np.arange(nsamples):
+#
+#     print "Subject {} (out of {})".format(isubj + 1, nsamples)
+#
+#     for iden, den in enumerate(densities):
+#
+#         W = netanalysis.thresholding(NETS[isubj], den)
+#         metrics = netanalysis.compute_metrics(W)
+#         newX[isubj,:,iden] = metrics
+#
+# X = newX
+#
+# # save data
+# import pickle
+# fout=open('data.txt', 'w')
+# pickle.dump([X,Y], fout)
+# fout.close()
+
+# read from disk
+import pickle
+fin=open('data.txt', 'r')
+X,Y=pickle.load(fin)
+fin.close()
 
 
 # *******************************************
@@ -96,7 +96,7 @@ if doNet:
 # *******************************************
 # *******************************************
 # Now we have a new set of features (if doNet is True)
-nsamples, nfeats = X.shape
+nsamples, nfeats, _ = X.shape
 
 # initialize variables
 nfolds = 10 # 10-fold cross-validation
@@ -108,12 +108,10 @@ scaling = False # feature scaling?
 importance_scores = np.zeros((NUM_TRIALS * nfolds, nfeats)) # store the importance of each feature across repetitions
 
 # --- select the classifier
-from MKLpy.algorithms import EasyMKL,RMGD,RMKL,AverageMKL
-from sklearn.metrics.pairwise import linear_kernel
+from MKLpy.algorithms import EasyMKL
 from sklearn.svm import SVC
-cflsvm = SVC(C = 1e-2, class_weight='balanced', random_state = 1, kernel= 'precomputed')
-clf = EasyMKL(estimator=cflsvm)
-
+clfsvm = SVC(C = 1, class_weight='balanced', random_state = 1, kernel= 'precomputed')
+clf = EasyMKL(estimator=clfsvm, lam=0)
 
 # ---
 
@@ -170,8 +168,8 @@ for itrial in np.arange(NUM_TRIALS):
             if i % 100 == 0:
                 print "Features {} (out of {})".format(i+1, nfeats_limit)
 
-
-            KL = [linear_kernel(X[:, ranking[0:i + 1]])]
+            from sklearn.metrics.pairwise import linear_kernel, rbf_kernel
+            KL = [linear_kernel(X[:, ranking[0:i + 1]]), rbf_kernel(X[:, ranking[0:i + 1]])]
             Ktrain = [K[indxtrain][:, indxtrain] for K in KL]
             Ktest = [K[indxtest][:, indxtrain] for K in KL]
 
