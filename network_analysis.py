@@ -45,13 +45,10 @@ def compute_metrics(W):
     eigenvector = np.array(nx.eigenvector_centrality(W, weight = 'weight').values())
     eigenvector = (eigenvector-eigenvector.mean())/eigenvector.std(ddof=1)
 
-    # # --- harmonic
-    # harmonic = np.array(nx.harmonic_centrality(W).values())
-    # harmonic = (harmonic-harmonic.mean())/harmonic.std(ddof=1)
-
     # # --- clustering
     clustering = np.array(nx.clustering(W, weight = 'weight').values())
     clustering=(clustering-clustering.mean())/clustering.std(ddof=1)
+
     # ---concatenate features
     return np.hstack((strength, closeness, betweenness, eigenvector, clustering))
 

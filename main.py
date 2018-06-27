@@ -33,8 +33,6 @@ if doEda:
     eda.edges(X, n)
 
 # Given the previous analysis, remove median and mad variables
-# X = np.hstack((X[:,0:n*2], X[:,4*n:5*n]))
-X = X[:,0:n]
 
 
 # *******************************************
@@ -44,47 +42,59 @@ X = X[:,0:n]
 # *******************************************
 # *******************************************
 # *******************************************
-import network_analysis as netanalysis
-reload(netanalysis)
+doNet = True
 
-nsamples, nfeats = X.shape
-nROIs = 102
-NETS = np.zeros((nsamples, nROIs, nROIs)) # variable to store subject-specific networks
+if doNet:
 
-for isubj in np.arange(nsamples):
+    import network_analysis as netanalysis
+    reload(netanalysis)
 
-    W = netanalysis.reconstruct_net(X[isubj,:], nROIs)
-    NETS[isubj] = W
+    X = X[:, 0:n]
+    nsamples, nfeats = X.shape
+    nROIs = 102
+    NETS = np.zeros((nsamples, nROIs, nROIs)) # variable to store subject-specific networks
 
 
-# Feature extraction based on network measures
-densities = [70, 80, 90, 100]
-nofmetrics = 5 # degree, closeness, ...
-newX = np.zeros((nsamples, nROIs*nofmetrics, len(densities)))
 
-# for isubj in np.arange(nsamples):
-#
-#     print "Subject {} (out of {})".format(isubj + 1, nsamples)
-#
-#     for iden, den in enumerate(densities):
-#
-#         W = netanalysis.thresholding(NETS[isubj], den)
-#         metrics = netanalysis.compute_metrics(W)
-#         newX[isubj,:,iden] = metrics
-#
-# X = newX
-#
-# # save data
-# import pickle
-# fout=open('data.txt', 'w')
-# pickle.dump([X,Y], fout)
-# fout.close()
+    for isubj in np.arange(nsamples):
 
-# read from disk
-import pickle
-fin=open('data.txt', 'r')
-X,Y=pickle.load(fin)
-fin.close()
+        W = netanalysis.reconstruct_net(X[isubj,:], nROIs)
+        NETS[isubj] = W
+
+
+    # Feature extraction based on network measures
+    densities = [50, 60, 70, 80, 90, 100]
+    nofmetrics = 5 # degree, closeness, ...
+    newX = np.zeros((nsamples, nROIs*nofmetrics, len(densities)))
+
+    # for isubj in np.arange(nsamples):
+    #
+    #     print "Subject {} (out of {})".format(isubj + 1, nsamples)
+    #
+    #     for iden, den in enumerate(densities):
+    #
+    #         W = netanalysis.thresholding(NETS[isubj], den)
+    #         metrics = netanalysis.compute_metrics(W)
+    #         newX[isubj,:,iden] = metrics
+    #
+    # X = newX
+    #
+    # # save data
+    # import pickle
+    # fout=open('data.txt', 'w')
+    # pickle.dump([X,Y], fout)
+    # fout.close()
+
+    # read from disk
+    import pickle
+    fin=open('data.txt', 'r')
+    X,Y=pickle.load(fin)
+    fin.close()
+
+else:
+
+    X = np.dstack((X[:,0:n], X[:,n:2*n], X[:,4*n:5*n]))
+    densities = [0,1,2]
 
 
 # *******************************************
@@ -102,10 +112,11 @@ nfolds = 10 # 10-fold cross-validation
 NUM_TRIALS = 1 # 10-repeated 10-fold cross-validation
 
 # --- select the classifier
-from MKLpy.algorithms import EasyMKL
+from MKLpy.algorithms import EasyMKL, AverageMKL
 from sklearn.svm import SVC
 clfsvm = SVC(C = 1e-2, class_weight='balanced', random_state = 1, kernel= 'precomputed')
-clf = EasyMKL(estimator=clfsvm, lam=0.1)
+# clf = EasyMKL(estimator=clfsvm, lam=0.1)
+clf = AverageMKL(estimator=clfsvm)
 
 
 # variables to store the outcome
@@ -136,12 +147,10 @@ for itrial in np.arange(NUM_TRIALS):
 
             import feature_selection as fs
             reload(fs)
-
-            if den ==100:
-                features = fs.select_features(X[indxtrain, :, iden], Y[indxtrain])
-
+            if den != 50 and den != 60 and den != 70 and den != 80:
+                features = fs.rfs(X[indxtrain, :, iden], Y[indxtrain], NUM_TRIALS=1)
                # generate kernel
-                from sklearn.metrics.pairwise import linear_kernel
+                from sklearn.metrics.pairwise import linear_kernel, rbf_kernel
                 KL.append(linear_kernel(X[:, features, iden]))
 
         Ktrain = [K[indxtrain][:, indxtrain] for K in KL]
@@ -170,7 +179,6 @@ for itrial in np.arange(NUM_TRIALS):
 
         icv += 1
 
-
 # # *******************************************
 # # *******************************************
 # # *******************************************
@@ -180,6 +188,7 @@ for itrial in np.arange(NUM_TRIALS):
 # # *******************************************
 mean_test_auc = np.mean(test_AUC)
 mean_training_auc = np.mean(training_AUC)
+
 
 print "\n\nRESULT - Test AUC: {} - Training AUC: {}\n\n".format(mean_test_auc, mean_training_auc)
 
