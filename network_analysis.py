@@ -56,8 +56,6 @@ def compute_metrics(W):
 def maxcc(X, Y, th = 1.5):
     # X: features, Y: labels
 
-    import network_analysis as netanalysis
-    reload(netanalysis)
     import networkx as nx
     from scipy import stats
     nfeats = X.shape[1]
@@ -73,7 +71,7 @@ def maxcc(X, Y, th = 1.5):
 
     # reconstruct the network
     nROIs = 102
-    ADJ = netanalysis.reconstruct_net(t_test, nROIs)
+    ADJ = reconstruct_net(t_test, nROIs)
     ADJ = ADJ >= th
 
     # Find network components
