@@ -13,7 +13,7 @@ Data = pd.read_csv('meg_mci.csv')
 names = Data.keys()
 data = Data.values
 X = data[:,2:]
-Y = data[:,1] > 1
+Y = data[:,1] - 1
 
 # *******************************************
 # *******************************************
@@ -32,8 +32,6 @@ if doEda:
     reload(eda)
     eda.edges(X, n)
 
-# Given the previous analysis, remove median and mad variables
-
 
 # *******************************************
 # *******************************************
@@ -42,60 +40,51 @@ if doEda:
 # *******************************************
 # *******************************************
 # *******************************************
-doNet = True
 
-if doNet:
+import network_analysis as netanalysis
+reload(netanalysis)
 
-    import network_analysis as netanalysis
-    reload(netanalysis)
-
-    X = X[:, 0:n]
-    nsamples, nfeats = X.shape
-    nROIs = 102
-    NETS = np.zeros((nsamples, nROIs, nROIs)) # variable to store subject-specific networks
+X = X[:, 0:n]
+nsamples, nfeats = X.shape
+nROIs = 102
+NETS = np.zeros((nsamples, nROIs, nROIs)) # variable to store subject-specific networks
 
 
 
-    for isubj in np.arange(nsamples):
+for isubj in np.arange(nsamples):
 
-        W = netanalysis.reconstruct_net(X[isubj,:], nROIs)
-        NETS[isubj] = W
+    W = netanalysis.reconstruct_net(X[isubj,:], nROIs)
+    NETS[isubj] = W
 
 
-    # Feature extraction based on network measures
-    densities = [50, 60, 70, 80, 90, 100]
-    nofmetrics = 5 # degree, closeness, ...
-    newX = np.zeros((nsamples, nROIs*nofmetrics, len(densities)))
+# Feature extraction based on network measures
+densities = [70, 80, 90, 100]
+nofmetrics = 5 # degree, closeness, ...
+newX = np.zeros((nsamples, nROIs*nofmetrics, len(densities)))
 
-    # for isubj in np.arange(nsamples):
-    #
-    #     print "Subject {} (out of {})".format(isubj + 1, nsamples)
-    #
-    #     for iden, den in enumerate(densities):
-    #
-    #         W = netanalysis.thresholding(NETS[isubj], den)
-    #         metrics = netanalysis.compute_metrics(W)
-    #         newX[isubj,:,iden] = metrics
-    #
-    # X = newX
-    #
-    # # save data
-    # import pickle
-    # fout=open('data.txt', 'w')
-    # pickle.dump([X,Y], fout)
-    # fout.close()
+# for isubj in np.arange(nsamples):
+#
+#     print "Subject {} (out of {})".format(isubj + 1, nsamples)
+#
+#     for iden, den in enumerate(densities):
+#
+#         W = netanalysis.thresholding(NETS[isubj], den)
+#         metrics = netanalysis.compute_metrics(W)
+#         newX[isubj,:,iden] = metrics
+#
+# X = newX
+#
+# # save data
+# import pickle
+# fout=open('data.txt', 'w')
+# pickle.dump([X,Y], fout)
+# fout.close()
 
-    # read from disk
-    import pickle
-    fin=open('data.txt', 'r')
-    X,Y=pickle.load(fin)
-    fin.close()
-
-else:
-
-    X = np.dstack((X[:,0:n], X[:,n:2*n], X[:,4*n:5*n]))
-    densities = [0,1,2]
-
+# read from disk
+import pickle
+fin=open('data.txt', 'r')
+X,Y=pickle.load(fin)
+fin.close()
 
 # *******************************************
 # *******************************************
@@ -104,12 +93,11 @@ else:
 # *******************************************
 # *******************************************
 # *******************************************
-# Now we have a new set of features (if doNet is True)
 nsamples, nfeats, _ = X.shape
 
 # initialize variables
 nfolds = 10 # 10-fold cross-validation
-NUM_TRIALS = 1 # 10-repeated 10-fold cross-validation
+NUM_TRIALS = 1 # repeated 10-fold cross-validation
 
 # --- select the classifier
 from MKLpy.algorithms import EasyMKL, AverageMKL
@@ -126,7 +114,7 @@ training_AUC = np.zeros((NUM_TRIALS, nfolds)) # to have an idea about overfittin
 test_ACC = np.zeros((NUM_TRIALS, nfolds))
 test_F1 = np.zeros((NUM_TRIALS, nfolds))
 
-
+best_features=np.zeros(nfeats)
 # start the cross-validation procedure
 for itrial in np.arange(NUM_TRIALS):
 
@@ -147,11 +135,12 @@ for itrial in np.arange(NUM_TRIALS):
 
             import feature_selection as fs
             reload(fs)
-            if den != 50 and den != 60 and den != 70 and den != 80:
-                features = fs.rfs(X[indxtrain, :, iden], Y[indxtrain], NUM_TRIALS=1)
-               # generate kernel
-                from sklearn.metrics.pairwise import linear_kernel, rbf_kernel
-                KL.append(linear_kernel(X[:, features, iden]))
+
+            features = fs.rfs(X[indxtrain, :, iden], Y[indxtrain], NUM_TRIALS=1)
+            best_features[features] +=1
+           # generate kernel
+            from sklearn.metrics.pairwise import linear_kernel
+            KL.append(linear_kernel(X[:, features, iden]))
 
         Ktrain = [K[indxtrain][:, indxtrain] for K in KL]
         Ktest = [K[indxtest][:, indxtrain] for K in KL]
@@ -159,7 +148,7 @@ for itrial in np.arange(NUM_TRIALS):
         # --- train the model using the training folds
         clf.fit(Ktrain, Y[indxtrain])
 
-        # --- test the model in the remaining fold and compute the ROC curve
+        # --- test the model in the remaining fold
         from sklearn.metrics import roc_auc_score, f1_score
         y_scores = clf.decision_function(Ktest)
         y_predict = clf.predict(Ktest)
@@ -193,6 +182,8 @@ mean_training_auc = np.mean(training_AUC)
 print "\n\nRESULT - Test AUC: {} - Training AUC: {}\n\n".format(mean_test_auc, mean_training_auc)
 
 
+# Extract the most discriminative features
+BESTFEATS = np.reshape(best_features, (5,102))
 
 
 
