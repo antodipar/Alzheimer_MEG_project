@@ -13,7 +13,9 @@ Data = pd.read_csv('meg_mci.csv')
 names = Data.keys()
 data = Data.values
 X = data[:,2:]
-Y = data[:,1] > 1
+Y = data[:,1]
+Y=Y-1
+# Y = data[:,1] > 1
 
 # *******************************************
 # *******************************************
@@ -86,7 +88,7 @@ newX = np.zeros((nsamples, nROIs*nofmetrics, len(densities)))
 # read from disk
 import pickle
 fin=open('data.txt', 'r')
-X,Y=pickle.load(fin)
+X,_=pickle.load(fin)
 fin.close()
 
 
@@ -101,77 +103,62 @@ fin.close()
 # Now we have a new set of features (if doNet is True)
 nsamples, nfeats, _ = X.shape
 
-# initialize variables
-nfolds = 10 # 10-fold cross-validation
-NUM_TRIALS = 1 # 10-repeated 10-fold cross-validation
-
 # --- select the classifier
-from MKLpy.algorithms import EasyMKL, AverageMKL
+from MKLpy.algorithms import AverageMKL
 from sklearn.svm import SVC
 clfsvm = SVC(C = 1e-2, class_weight='balanced', random_state = 1, kernel= 'precomputed')
-# clf = EasyMKL(estimator=clfsvm, lam=0.1)
 clf = AverageMKL(estimator=clfsvm)
 
 
 # variables to store the outcome
-test_AUC = np.zeros((NUM_TRIALS, nfolds))
-training_AUC = np.zeros((NUM_TRIALS, nfolds)) # to have an idea about overfitting
-# other metrics to evaluate the classification performance
-test_ACC = np.zeros((NUM_TRIALS, nfolds))
-test_F1 = np.zeros((NUM_TRIALS, nfolds))
+test_SCORES = np.zeros((nsamples))
+test_ACC = np.zeros((nsamples))
+# to have an idea about overfitting
+training_ACC = np.zeros((nsamples))
 
 
 # start the cross-validation procedure
-for itrial in np.arange(NUM_TRIALS):
+from sklearn.model_selection import LeaveOneOut
+loo =  LeaveOneOut()
 
-    print "Trial {} (out of {})".format(itrial+1,NUM_TRIALS)
+icv = 0
+for indxtrain, indxtest in loo.split(X[:,:,0]):
 
-    # split the dataset into nfols
-    from sklearn.model_selection import StratifiedKFold
-    skf = StratifiedKFold(n_splits = nfolds, shuffle = True, random_state = itrial)
+    print "Subject {} (out of {})".format(icv + 1, nsamples)
+    KL = list()
+    for iden, den in enumerate(densities):
 
-    icv = 0
-    for indxtrain, indxtest in skf.split(X, Y):
+        print "Density {}".format(den)
 
-        print "Iteration {} (out of {})".format(icv + 1, nfolds)
-        KL = list()
-        for iden, den in enumerate(densities):
+        import feature_selection as fs
+        reload(fs)
+        if den != 50 and den != 60:
+            features = fs.rfs(X[indxtrain, :, iden], Y[indxtrain])
+           # generate kernel
+            from sklearn.metrics.pairwise import linear_kernel, rbf_kernel
+            KL.append(linear_kernel(X[:, features, iden]))
 
-            print "Density {}".format(den)
+    Ktrain = [K[indxtrain][:, indxtrain] for K in KL]
+    Ktest = [K[indxtest][:, indxtrain] for K in KL]
 
-            import feature_selection as fs
-            reload(fs)
-            if den != 50 and den != 60:
-                features = fs.rfs(X[indxtrain, :, iden], Y[indxtrain], NUM_TRIALS=1)
-               # generate kernel
-                from sklearn.metrics.pairwise import linear_kernel, rbf_kernel
-                KL.append(linear_kernel(X[:, features, iden]))
+    # --- train the model using the training folds
+    clf.fit(Ktrain, Y[indxtrain])
 
-        Ktrain = [K[indxtrain][:, indxtrain] for K in KL]
-        Ktest = [K[indxtest][:, indxtrain] for K in KL]
+    # --- test the model in the remaining fold and compute the ROC curve
+    from sklearn.metrics import roc_auc_score, f1_score
+    y_scores = clf.decision_function(Ktest)
+    y_true = Y[indxtest]
+    print "True: {} - Score: {}".format(y_true, y_scores)
+    test_SCORES[icv] = y_scores
+    test_ACC[icv] = clf.score(Ktest, y_true)
 
-        # --- train the model using the training folds
-        clf.fit(Ktrain, Y[indxtrain])
+    # --- test the model on the training samples too
+    y_true = Y[indxtrain]
+    training_ACC[icv] = clf.score(Ktrain, y_true)
 
-        # --- test the model in the remaining fold and compute the ROC curve
-        from sklearn.metrics import roc_auc_score, f1_score
-        y_scores = clf.decision_function(Ktest)
-        y_predict = clf.predict(Ktest)
-        y_true = Y[indxtest]
-        test_auc = roc_auc_score(y_true, y_scores)
-        test_AUC[itrial, icv] = test_auc
-        test_ACC[itrial, icv] = clf.score(Ktest, y_true)
-        test_F1[itrial, icv] = f1_score(y_true, y_predict)
+    print "Test ACC: {} - Training ACC: {}\n".format(test_ACC[icv], training_ACC[icv])
 
-        # --- test the model on the training samples too
-        y_scores = clf.decision_function(Ktrain)
-        y_true = Y[indxtrain]
-        training_auc = roc_auc_score(y_true, y_scores)
-        training_AUC[itrial, icv] = training_auc
-
-        print "Test AUC: {} - Training AUC: {}\n".format(test_auc, training_auc)
-
-        icv += 1
+    icv += 1
 
 # # *******************************************
 # # *******************************************
@@ -180,12 +167,13 @@ for itrial in np.arange(NUM_TRIALS):
 # # *******************************************
 # # *******************************************
 # # *******************************************
-mean_test_auc = np.mean(test_AUC)
-mean_training_auc = np.mean(training_AUC)
+
+mean_test_acc = np.mean(test_ACC)
+mean_training_acc = np.mean(training_ACC)
 
 
-print "\n\nRESULT - Test AUC: {} - Training AUC: {}\n\n".format(mean_test_auc, mean_training_auc)
-
+print "\n\nRESULT - Test ACC: {} - Training ACC: {}\n\n".format(mean_test_acc, mean_training_acc)
+print "AUC: ", roc_auc_score(Y, test_SCORES)
 
 
 

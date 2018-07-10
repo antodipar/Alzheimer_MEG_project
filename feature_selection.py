@@ -13,7 +13,7 @@ def lr(X,Y):
     return np.where(coef!=0)[0]
 
 
-def rfs(X,Y, NUM_TRIALS=10, nfolds=10, prct=20):
+def rfs(X,Y, NUM_TRIALS=1, nfolds=10, prct=20):
 
 
     nsamples, nfeats = X.shape
