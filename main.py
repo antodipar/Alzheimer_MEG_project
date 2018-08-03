@@ -86,6 +86,9 @@ fin=open('data.txt', 'r')
 X,Y=pickle.load(fin)
 fin.close()
 
+X = X[:,:,-1]
+
+
 # *******************************************
 # *******************************************
 # *******************************************
@@ -93,7 +96,7 @@ fin.close()
 # *******************************************
 # *******************************************
 # *******************************************
-nsamples, nfeats, _ = X.shape
+nsamples, nfeats = X.shape
 
 # initialize variables
 nfolds = 10 # 10-fold cross-validation
@@ -102,9 +105,7 @@ NUM_TRIALS = 1 # repeated 10-fold cross-validation
 # --- select the classifier
 from MKLpy.algorithms import EasyMKL, AverageMKL
 from sklearn.svm import SVC
-clfsvm = SVC(C = 1e-2, class_weight='balanced', random_state = 1, kernel= 'precomputed')
-# clf = EasyMKL(estimator=clfsvm, lam=0.1)
-clf = AverageMKL(estimator=clfsvm)
+clf = SVC(C = 1e-2, class_weight='balanced', random_state = 1, kernel= 'linear')
 
 
 # variables to store the outcome
@@ -115,6 +116,8 @@ test_ACC = np.zeros((NUM_TRIALS, nfolds))
 test_F1 = np.zeros((NUM_TRIALS, nfolds))
 
 best_features=np.zeros(nfeats)
+Nfeats = np.zeros(nfolds)
+Y_scores = np.zeros(nsamples)
 # start the cross-validation procedure
 for itrial in np.arange(NUM_TRIALS):
 
@@ -128,38 +131,29 @@ for itrial in np.arange(NUM_TRIALS):
     for indxtrain, indxtest in skf.split(X, Y):
 
         print "Iteration {} (out of {})".format(icv + 1, nfolds)
-        KL = list()
-        for iden, den in enumerate(densities):
 
-            print "Density {}".format(den)
+        import feature_selection as fs
+        reload(fs)
 
-            import feature_selection as fs
-            reload(fs)
-
-            features = fs.rfs(X[indxtrain, :, iden], Y[indxtrain], NUM_TRIALS=1)
-            best_features[features] +=1
-           # generate kernel
-            from sklearn.metrics.pairwise import linear_kernel
-            KL.append(linear_kernel(X[:, features, iden]))
-
-        Ktrain = [K[indxtrain][:, indxtrain] for K in KL]
-        Ktest = [K[indxtest][:, indxtrain] for K in KL]
+        features = fs.rfs(X[indxtrain, :], Y[indxtrain], NUM_TRIALS=1)
+        Nfeats[icv] = len(features)
+        best_features[features] +=1
 
         # --- train the model using the training folds
-        clf.fit(Ktrain, Y[indxtrain])
+        clf.fit(X[indxtrain[:,np.newaxis], features], Y[indxtrain])
 
         # --- test the model in the remaining fold
-        from sklearn.metrics import roc_auc_score, f1_score
-        y_scores = clf.decision_function(Ktest)
-        y_predict = clf.predict(Ktest)
+        from sklearn.metrics import roc_auc_score, roc_curve, f1_score
+        y_scores = clf.decision_function(X[indxtest[:,np.newaxis], features])
+        y_predict = clf.predict(X[indxtest[:,np.newaxis], features])
         y_true = Y[indxtest]
         test_auc = roc_auc_score(y_true, y_scores)
         test_AUC[itrial, icv] = test_auc
-        test_ACC[itrial, icv] = clf.score(Ktest, y_true)
+        test_ACC[itrial, icv] = clf.score(X[indxtest[:,np.newaxis], features], y_true)
         test_F1[itrial, icv] = f1_score(y_true, y_predict)
-
+        Y_scores[indxtest]=y_scores
         # --- test the model on the training samples too
-        y_scores = clf.decision_function(Ktrain)
+        y_scores = clf.decision_function(X[indxtrain[:,np.newaxis], features])
         y_true = Y[indxtrain]
         training_auc = roc_auc_score(y_true, y_scores)
         training_AUC[itrial, icv] = training_auc
@@ -183,7 +177,57 @@ print "\n\nRESULT - Test AUC: {} - Training AUC: {}\n\n".format(mean_test_auc, m
 
 
 # Extract the most discriminative features
+nfeat_opt = int(round(np.mean(Nfeats)))
 BESTFEATS = np.reshape(best_features, (5,102))
+BESTFEATS = np.sum(BESTFEATS, axis=0)
+indx = np.argsort(BESTFEATS)[::-1]
+print "Optimal number of features: {} - Best_sensors: {}".format(nfeat_opt, indx[:nfeat_opt]+1)
 
 
+# ROC curve
+from scipy import stats
+fpr, tpr, thr = roc_curve(Y, Y_scores)
+plt.plot(fpr, tpr, color='b',
+         label=r'ROC',
+         lw=2)
+
+auc = roc_auc_score(Y, Y_scores)
+neg=Y_scores[Y==0]
+pos=Y_scores[Y==1]
+# AUC null
+U, pauc=stats.mannwhitneyu(pos,neg, alternative="greater")
+print "AUC = {} (P-value = {})".format(auc,pauc)
+
+
+# optimal point
+from scipy.spatial.distance import cdist
+
+D = cdist(np.array([0, 1.0])[np.newaxis, :], np.concatenate((fpr[:, np.newaxis], tpr[:, np.newaxis]), axis=1),
+          'euclidean')
+
+optpoint = np.argmin(D)
+thropt = thr[optpoint]
+cx = fpr[optpoint]
+cy = tpr[optpoint]
+sensibility = cy
+psens = stats.binom_test(round(sensibility * 78), 78, alternative="greater")
+specificity = 1 - cx
+pspec = stats.binom_test(round(specificity * 54), 54, alternative="greater")
+accuracy = (sensibility * 78 + specificity * 54) / (132)
+pacc = stats.binom_test(round(sensibility * 78 + specificity * 54), 132, alternative="greater")
+print "Optimal threshold = {}".format(thropt)
+print "Optimal point. Accuracy = %0.2f (P-value=%0.2e). Sensibility = %0.2f (P-value=%0.2e). Specificity = %0.2f (P-value=%0.2e)" \
+      % (accuracy * 100, pacc, sensibility * 100, psens, specificity * 100, pspec)
+plt.scatter(cx, cy, color='r', linewidths=1, alpha=1, zorder=5, marker="o", label='Optimal point')
+
+# customize plot
+plt.xlim([-0.05, 1.05])
+plt.ylim([-0.05, 1.05])
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.legend(loc="lower right")
+plt.grid(True)
+plt.savefig('ROC.pdf')
+plt.savefig('ROC.tif', dpi=500)
+plt.show()
 
