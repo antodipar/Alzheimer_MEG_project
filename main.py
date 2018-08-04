@@ -135,7 +135,7 @@ for itrial in np.arange(NUM_TRIALS):
         import feature_selection as fs
         reload(fs)
 
-        features = fs.rfs(X[indxtrain, :], Y[indxtrain], NUM_TRIALS=1)
+        features = fs.rfs(X[indxtrain, :], Y[indxtrain], NUM_TRIALS=1, prct=20)
         Nfeats[icv] = len(features)
         best_features[features] +=1
 
@@ -178,11 +178,7 @@ print "\n\nRESULT - Test AUC: {} - Training AUC: {}\n\n".format(mean_test_auc, m
 
 # Extract the most discriminative features
 nfeat_opt = int(round(np.mean(Nfeats)))
-BESTFEATS = np.reshape(best_features, (5,102))
-BESTFEATS = np.sum(BESTFEATS, axis=0)
-indx = np.argsort(BESTFEATS)[::-1]
-print "Optimal number of features: {} - Best_sensors: {}".format(nfeat_opt, indx[:nfeat_opt]+1)
-
+indx = np.argsort(best_features)[::-1]
 
 # ROC curve
 from scipy import stats

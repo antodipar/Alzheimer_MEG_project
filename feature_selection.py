@@ -109,19 +109,22 @@ def rfs(X,Y, NUM_TRIALS=10, nfolds=10, prct=20):
 
     # plt.figure()
     #
-    # plt.plot(np.arange(1, nfeats + 1), mean_test_auc, color='b', lw=2, label="Mean Test AUC")
-    # plt.fill_between(np.arange(1,nfeats+1), test_auc_lower, test_auc_upper, color='grey', alpha=.2, label=r'$\pm$ 1 SD.')
+    # plt.plot(np.arange(1, nfeats + 1), mean_test_auc, color='b', lw=2, label="Mean Validation AUC")
+    # # plt.fill_between(np.arange(1,nfeats+1), test_auc_lower, test_auc_upper, color='grey', alpha=.2, label=r'$\pm$ 1 SD.')
     #
-    # plt.plot(np.arange(1, nfeats + 1), mean_training_auc, color='g', lw=2, label="Mean Training AUC")
-    # plt.fill_between(np.arange(1,nfeats+1), training_auc_lower, training_auc_upper, color='red', alpha=.2, label=r'$\pm$ 1 SD.')
+    # # plt.plot(np.arange(1, nfeats + 1), mean_training_auc, color='g', lw=2, label="Mean Training AUC")
+    # # plt.fill_between(np.arange(1,nfeats+1), training_auc_lower, training_auc_upper, color='red', alpha=.2, label=r'$\pm$ 1 SD.')
     #
-    # plt.scatter(max_indx+1, mean_test_auc[max_indx], color='k', marker="D", linewidths=1, alpha=1, zorder=5, label="Max AUC")
+    # # plt.scatter(max_indx+1, mean_test_auc[max_indx], color='k', marker="D", linewidths=1, alpha=1, zorder=5, label="Max AUC")
     # plt.xlabel('Number of features')
     # plt.ylabel('AUC')
     # plt.legend(loc="lower right")
     # plt.grid(True)
-    # plt.xlim([-2, nfeats+2])
+    # print nfeats_limit
+    # plt.xlim([1, nfeats_limit-0.5])
     # plt.ylim([0, 1.1])
+    # plt.savefig('profile.pdf')
+    # plt.savefig('profile.tif', dpi=500)
     # plt.show()
 
     return final_ranking[:max_indx+1]
