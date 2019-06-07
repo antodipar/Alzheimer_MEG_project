@@ -62,29 +62,29 @@ densities = [70, 80, 90, 100]
 nofmetrics = 5 # degree, closeness, ...
 newX = np.zeros((nsamples, nROIs*nofmetrics, len(densities)))
 
-# for isubj in np.arange(nsamples):
-#
-#     print "Subject {} (out of {})".format(isubj + 1, nsamples)
-#
-#     for iden, den in enumerate(densities):
-#
-#         W = netanalysis.thresholding(NETS[isubj], den)
-#         metrics = netanalysis.compute_metrics(W)
-#         newX[isubj,:,iden] = metrics
-#
-# X = newX
-#
-# # save data
-# import pickle
-# fout=open('data.txt', 'w')
-# pickle.dump([X,Y], fout)
-# fout.close()
+for isubj in np.arange(nsamples):
 
-# read from disk
+    print "Subject {} (out of {})".format(isubj + 1, nsamples)
+
+    for iden, den in enumerate(densities):
+
+        W = netanalysis.thresholding(NETS[isubj], den)
+        metrics = netanalysis.compute_metrics(W)
+        newX[isubj,:,iden] = metrics
+
+X = newX
+
+# save data
 import pickle
-fin=open('data.txt', 'r')
-X,Y=pickle.load(fin)
-fin.close()
+fout=open('data.txt', 'w')
+pickle.dump([X,Y], fout)
+fout.close()
+
+# # read from disk
+# import pickle
+# fin=open('data.txt', 'r')
+# X,Y=pickle.load(fin)
+# fin.close()
 
 X = X[:,:,-1]
 
@@ -224,6 +224,5 @@ plt.ylabel('True Positive Rate')
 plt.legend(loc="lower right")
 plt.grid(True)
 plt.savefig('ROC.pdf')
-plt.savefig('ROC.tif', dpi=500)
+# plt.savefig('ROC.tif', dpi=500)
 plt.show()
-

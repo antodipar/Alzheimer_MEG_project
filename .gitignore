@@ -6,3 +6,4 @@ ROC.tif
 profile.pdf
 profile.tif
 env/
+*.pyc
