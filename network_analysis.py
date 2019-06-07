@@ -10,65 +10,58 @@ def reconstruct_net(links, nROIs):
     return W + W.T
 
 
-def thresholding(net, densities):
+def thresholding(W, density):
 
     # initialize some variables
-    nROIs= net.shape[0]
+    nROIs= W.shape[0]
     mask = np.triu(np.ones((nROIs, nROIs), dtype=bool), k=1)
-    links = net[mask]
+    links = W[mask]
     ranking = np.argsort(links)
     ranking = ranking[::-1]
     nlinks = len(links)
-    # the outcome to be returned
-    thr_nets = np.zeros((len(densities), nROIs, nROIs))
-
-    for iden, density in enumerate(densities):
-
-        newlinks = links.copy()
-        nlinks2keep = int(round(density*1.0/100*nlinks))
-        # newlinks[ranking[:nlinks2keep]] = 1
-        newlinks[ranking[nlinks2keep:]] = 0
-        W = reconstruct_net(newlinks, nROIs)
-        thr_nets[iden] = W
+    nlinks2keep = int(round(density * 1.0 / 100 * nlinks))
+    # links[ranking[:nlinks2keep]] = 1
+    links[ranking[nlinks2keep:]] = 0
+    return reconstruct_net(links, nROIs)
 
 
-    return thr_nets
-
-def compute_metrics(nets):
+def compute_metrics(W):
 
     import networkx as nx
 
-    features = np.array([])
+    W = nx.Graph(W)
 
-    for W in nets:
+    # --- strength
+    st = W.degree(weight = 'weight')
+    strength = np.array([info[1] for info in st])
+    strength=(strength-strength.mean())/strength.std(ddof=1)
 
-        W = nx.Graph(W)
+    # --- closeness
+    closeness = np.array(nx.closeness_centrality(W, distance = 'weight').values())
+    closeness = (closeness-closeness.mean())/closeness.std(ddof=1)
 
-        # --- strength
-        st = W.degree(weight = 'weight')
-        strength = np.array([info[1] for info in st])
-        strength=(strength-strength.mean())/strength.std(ddof=1)
-        # --- closeness
-        closeness = np.array(nx.closeness_centrality(W, distance = 'weight').values())
-        closeness = (closeness-closeness.mean())/closeness.std(ddof=1)
-        # --- betweenness centrality
-        betweenness = np.array(nx.betweenness_centrality(W, weight = 'weight').values())
-        betweenness = (betweenness-betweenness.mean())/betweenness.std(ddof=1)
-        # --- eigenvector
-        eigenvector = np.array(nx.eigenvector_centrality(W, weight = 'weight').values())
-        eigenvector = (eigenvector-eigenvector.mean())/eigenvector.std(ddof=1)
+    # --- betweenness centrality
+    betweenness = np.array(nx.betweenness_centrality(W, weight = 'weight').values())
+    betweenness = (betweenness-betweenness.mean())/betweenness.std(ddof=1)
 
-        # --- harmonic
-        harmonic = np.array(nx.harmonic_centrality(W).values())
-        harmonic = (harmonic-harmonic.mean())/harmonic.std(ddof=1)
+    # --- eigenvector
+    eigenvector = np.array(nx.eigenvector_centrality(W, weight = 'weight').values())
+    eigenvector = (eigenvector-eigenvector.mean())/eigenvector.std(ddof=1)
 
-        # # --- clustering
-        clustering = np.array(nx.clustering(W, weight = 'weight').values())
-        clustering=(clustering-clustering.mean())/clustering.std(ddof=1)
-        # ---concatenate features
-        features = np.concatenate((features, strength, closeness, eigenvector, betweenness, clustering, harmonic))
+    # # --- clustering
+    clustering = np.array(nx.clustering(W, weight = 'weight').values())
+    clustering=(clustering-clustering.mean())/clustering.std(ddof=1)
 
-    return features
+    # ## --- pagerank
+    # pagerank = np.array(nx.pagerank(W, weight='weight').values())
+    # pagerank = (pagerank - pagerank.mean()) / pagerank.std(ddof=1)
+    #
+    # ## --- hits
+    # hits = np.array(nx.hits(W)[0].values())
+    # hits = (hits - hits.mean()) / hits.std(ddof=1)
 
+
+    # ---concatenate features
+    return np.hstack((strength, closeness, betweenness, eigenvector, clustering))
 
 
